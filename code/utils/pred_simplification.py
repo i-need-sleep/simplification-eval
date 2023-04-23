@@ -71,8 +71,8 @@ def gpt3_inference(engine, dataset, save_interval=100):
                 c = openai.Completion.create(
                     model=engine,
                     prompt=prompt,
-                    max_tokens=1024,
-                    temperature=0,
+                    max_tokens=256,
+                    temperature=0.8,
                 )
                 break
             except:
