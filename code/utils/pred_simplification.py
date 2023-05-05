@@ -34,7 +34,7 @@ def gptturbo_inference(dataset, save_interval=500):
         src = line['src']
         prompt = line['prompt']
 
-        pause_idx = 0
+        pause_idx = 0 # Try for a maximum of 5 times. Skip the sequence if failed.
         while True:
             try:
                 c = openai.ChatCompletion.create(
@@ -89,6 +89,7 @@ def gpt3_inference(engine, dataset, save_interval=100):
         src = line['src']
         prompt = line['prompt'][1]['content']
 
+        pause_idx = 0
         while True:
             try:
                 c = openai.Completion.create(
@@ -101,7 +102,13 @@ def gpt3_inference(engine, dataset, save_interval=100):
             except:
                 print("pausing")
                 time.sleep(1)
+                pause_idx += 1
+                if pause_idx == 5:
+                    break
                 continue
+        
+        if pause_idx == 5:
+            continue
 
         pred = c['choices'][0]['text'].split('\n')[0]
 
