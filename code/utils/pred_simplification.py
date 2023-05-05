@@ -34,19 +34,19 @@ def gptturbo_inference(dataset, save_interval=500):
         src = line['src']
         prompt = line['prompt']
 
-        while True:
-            try:
-                c = openai.ChatCompletion.create(
-                    model='gpt-3.5-turbo',
-                    messages=prompt,
-                    max_tokens=1024,
-                    temperature=0,
-                )
-                break
-            except:
-                print("pausing")
-                time.sleep(1)
-                continue
+        # while True:
+        #     try:
+        c = openai.ChatCompletion.create(
+            model='gpt-3.5-turbo',
+            messages=prompt,
+            max_tokens=1024,
+            temperature=0,
+        )
+            #     break
+            # except:
+            #     print("pausing")
+            #     time.sleep(1)
+            #     continue
 
 
         pred = c['choices'][0]['message']['content']
