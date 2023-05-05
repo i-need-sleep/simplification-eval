@@ -25,6 +25,7 @@ def gptturbo_inference(dataset, save_interval=500):
         data = pd.read_csv(out_path)
         out['src'] = list(data['src'])
         out['pred'] = list(data['pred'])
+        print(f'Continuing from {out_path}')
 
     for line_idx, line in enumerate(dataset):
         if line_idx < len(out['pred']):
@@ -74,6 +75,7 @@ def gpt3_inference(engine, dataset, save_interval=100):
         data = pd.read_csv(out_path)
         out['src'] = list(data['src'])
         out['pred'] = list(data['pred'])
+        print(f'Continuing from {out_path}')
 
     for line_idx, line in enumerate(dataset):
         if line_idx < len(out['pred']):
