@@ -6,7 +6,9 @@ import utils.pretrain_stage_1_data_utils as pt_stage1_data_utils
 def main(args):
     print(args)
 
-    if args.method == 'gpt_turbo':
+    if args.method == 'save_txt':
+        dataset = pt_stage1_data_utils.OpenWebTextDataset('save_txt', 6, debug=False)
+    elif args.method == 'gpt_turbo':
         dataset = pt_stage1_data_utils.OpenWebTextDataset('prompt', 6, debug=False)
         pred_simplification.gptturbo_inference(dataset)
     elif args.method == 'gpt_curie':

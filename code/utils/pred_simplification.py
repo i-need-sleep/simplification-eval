@@ -34,6 +34,7 @@ def gptturbo_inference(dataset, save_interval=500):
         src = line['src']
         prompt = line['prompt']
 
+        pause_idx = 0
         while True:
             try:
                 c = openai.ChatCompletion.create(
@@ -46,9 +47,13 @@ def gptturbo_inference(dataset, save_interval=500):
             except:
                 print("pausing")
                 time.sleep(1)
+                pause_idx += 1
+                if pause_idx == 5:
+                    break
                 continue
 
-
+        if pause_idx == 5:
+            continue
         pred = c['choices'][0]['message']['content']
 
 

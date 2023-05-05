@@ -24,6 +24,8 @@ class OpenWebTextDataset(torch.utils.data.Dataset):
 
         if self.out_format == 'prompt':
             self.data = self.build_prompts()
+        elif self.out_format == 'save_txt':
+            self.save_txt()
         else:
             raise NotImplementedError
         
@@ -63,6 +65,14 @@ class OpenWebTextDataset(torch.utils.data.Dataset):
         sentences = nltk.tokenize.sent_tokenize(self.text)
         print(f'# Sentences {len(sentences)}')
         return sentences
+    
+    def save_txt(self):
+        # Save the sentences line-by-line into a txt file
+        out = ''
+        for sent in self.sentences:
+            out += sent + '\n'
+        with open(f'{uglobals.SIM_OPENWEBTEXT_DIR}/original.en', 'w') as f:
+            f.write(out)
     
     def build_prompts(self, n_shot=5, start_idx=23, interval=100):
         # Load in-context examples from TurkCorpus
