@@ -71,7 +71,7 @@ class OpenWebTextDataset(torch.utils.data.Dataset):
         out = ''
         for sent in self.sentences:
             out += sent + '\n'
-        with open(f'{uglobals.SIM_OPENWEBTEXT_DIR}/original.en', 'w') as f:
+        with open(f'{uglobals.SIM_OPENWEBTEXT_DIR}/original.en', 'w', encoding='utf-8') as f:
             f.write(out)
     
     def build_prompts(self, n_shot=5, start_idx=23, interval=100):
