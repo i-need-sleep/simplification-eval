@@ -13,3 +13,8 @@ SIM_OPENWEBTEXT_DIR = f'{PROCESSED_DIR}/openwebtext'
 RESULTS_DIR = '../results'
 CHECKPOINTS_DIR = f'{RESULTS_DIR}/checkpoints'
 OUTPUTS_DIR = f'{RESULTS_DIR}/outputs'
+
+# Resources
+PRETRAINED_DIR = '../pretrained'
+DERBERTA_MODEL_DIR = f'{PRETRAINED_DIR}/checkpoints/deberta'
+DERBERTA_TOKENIZER_DIR = f'{PRETRAINED_DIR}/tokenizers/deberta'

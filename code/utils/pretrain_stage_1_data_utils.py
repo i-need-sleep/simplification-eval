@@ -5,6 +5,7 @@ import copy
 import torch
 import nltk
 import transformers
+import pandas as pd
 
 import utils.globals as uglobals
 
@@ -108,3 +109,25 @@ class OpenWebTextDataset(torch.utils.data.Dataset):
                 'src': sent
             })
         return out
+    
+def convert_for_commonlit(path):
+    df = pd.read_csv(path)
+    srcs = df['src'].tolist()
+    preds = df['pred'].tolist()
+    indices = [i for i in range(len(srcs))]
+    
+    df_src = pd.DataFrame({
+        'id': indices,
+        'url_legal': ['' for _ in indices],
+        'license': ['' for _ in indices],
+        'excerpt': srcs,
+    })
+    df_src.to_csv(path.replace('csv', '_commonlit_src.csv'), index=False)
+
+    df_pred = pd.DataFrame({
+        'id': indices,
+        'url_legal': ['' for _ in indices],
+        'license': ['' for _ in indices],
+        'excerpt': preds,
+    })
+    df_pred.to_csv(path.replace('csv', '_commonlit_pred.csv'))

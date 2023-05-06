@@ -26,6 +26,10 @@ data/*/*
 
 # Models
 *.pt
+*.bin
+*.model
+pretrained
+code/models/commonlit
 
 # sh
 *.err
