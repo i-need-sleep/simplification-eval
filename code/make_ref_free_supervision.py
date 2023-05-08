@@ -58,7 +58,10 @@ class RefFreeSupervision():
         print('Calculating Self-BLEU')
         self_bleu = []
         for idx, (src, pred) in enumerate(tqdm.tqdm(zip(srcs, preds))):
-            score = self.bleu.compute(predictions = [pred], references = [[src]])['bleu']
+            try:
+                score = self.bleu.compute(predictions = [pred], references = [[src]])['bleu']
+            except:
+                score = 0
             self_bleu.append(score)
         return self_bleu
     
@@ -109,14 +112,20 @@ class RefFreeSupervision():
         print('Calculating #syllables per word')
         src_scores, pred_scores = [], []
         for idx, (src, pred) in enumerate(tqdm.tqdm(zip(srcs, preds))):
-            src_score = textstat.syllable_count(src) / textstat.lexicon_count(src)
-            pred_score = textstat.syllable_count(pred) / textstat.lexicon_count(pred)
+            try:
+                src_score = textstat.syllable_count(src) / textstat.lexicon_count(src)
+            except:
+                src_score = 0
+            try:
+                pred_score = textstat.syllable_count(pred) / textstat.lexicon_count(pred)
+            except:
+                pred_score = 0
             src_scores.append(src_score)
             pred_scores.append(pred_score)
         return src_scores, pred_scores
 
 if __name__ == '__main__':
-    paths = [f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_turbo.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_curie.csv']
+    paths = [f'{uglobals.PROCESSED_DIR}/openwebtext/muss.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_curie.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/augmented.csv']
     supervisor = RefFreeSupervision()
     supervisor.make_ref_free_supervisions(paths)
     

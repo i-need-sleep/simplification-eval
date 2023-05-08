@@ -131,3 +131,38 @@ def convert_for_commonlit(path):
         'excerpt': preds,
     })
     df_pred.to_csv(path.replace('csv', '_commonlit_pred.csv'))
+
+def muss_to_csv(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    src = []
+    pred = []
+    for idx, line in enumerate(lines):
+        if idx % 3 == 1:
+            src.append(line[9:].strip())
+        elif idx % 3 == 2:
+            pred.append(line[11:].strip())
+    df = pd.DataFrame({
+        'src': src,
+        'pred': pred
+    })
+    df.to_csv(path.replace('.out', '.csv'))
+
+def piece_commonlit_supervision(names):
+    # Piece together commonlit scores (src and pred) with other supervision signals
+    for name in names:
+        data_path = f'{uglobals.PROCESSED_DIR}/openwebtext/supervision/{name}_supervision.csv'
+        commonlit_src_path = f'{uglobals.PROCESSED_DIR}/openwebtext/supervision/{name}_src_commonlit_out.csv'
+        commonlit_pred_path = f'{uglobals.PROCESSED_DIR}/openwebtext/supervision/{name}_pred_commonlit_out.csv'
+        out_path = f'{uglobals.PROCESSED_DIR}/openwebtext/train/{name}.csv'
+
+        out = {}
+        df = pd.read_csv(data_path)
+        for col in df.columns:
+            if col != 'Unnamed: 0':
+                out[col] = df[col].tolist()
+        out['commonlit_src'] = pd.read_csv(commonlit_src_path)['target'].tolist()
+        out['commonlit_pred'] = pd.read_csv(commonlit_pred_path)['target'].tolist()
+        
+        pd.DataFrame(out).to_csv(out_path)
+        print(f'Saved at {out_path}')

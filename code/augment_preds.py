@@ -108,6 +108,6 @@ def augment_preds(augment, paths):
     return
 
 if __name__ == '__main__':
-    paths = [f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_turbo.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_curie.csv']
+    paths = [f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_turbo.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_curie.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/muss.csv']
     augment = Augment()
     augment_preds(augment, paths)
