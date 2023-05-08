@@ -20,6 +20,9 @@ class DebertaForEval(torch.nn.Module):
         token_type_ids =  torch.tensor(tokenized['token_type_ids']).to(self.device)
         attention_mask =  torch.tensor(tokenized['attention_mask']).to(self.device)
         model_out = self.deberta(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)[0][:, 0, :] # Take the emb for the first token
-        heads_out = [head(model_out) for head in self.regression_heads]
+
+        heads_out = []
+        for head in self.regression_heads:
+            heads_out.append(head(model_out))
         heads_out = torch.cat(heads_out, dim=1)
         return heads_out # [batch_size, n_head]
