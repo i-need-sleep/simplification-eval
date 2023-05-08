@@ -17,6 +17,7 @@ class DebertaForEval(torch.nn.Module):
         self.relu = torch.nn.ReLU()
 
         self.to(device)
+        self.float()
     
     def forward(self, sents):
         tokenized = self.tokenizer(sents, padding=True, truncation=True)

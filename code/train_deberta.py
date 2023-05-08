@@ -100,18 +100,18 @@ def train_step(batch, model, optimizer, criterion, device):
 
     # Unpack the batch
     sents, scores, score_masks = batch
-    scores = scores.to(device)
-    score_masks = score_masks.to(device)
+    scores = scores.to(device).float()
+    score_masks = score_masks.to(device).float()
     
     # Forward
-    pred = model(sents)
+    pred = model(sents).float()
 
     # Apply score masks: zero-out unavailable scores
     pred = pred * score_masks
     scores = scores * score_masks
 
     # Loss
-    loss = criterion(pred, scores)
+    loss = criterion(pred, scores).float()
 
     # Backward
     loss.backward()
