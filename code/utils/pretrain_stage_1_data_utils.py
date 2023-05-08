@@ -13,18 +13,22 @@ import utils.globals as uglobals
 torch.autograd.set_detect_anomaly(True)
 
 class OpenWebTextDataset(torch.utils.data.Dataset):
-    def __init__(self, out_format, n_volumns=10, debug=False):
+    def __init__(self, out_format, txt_path=None, n_volumns=10, debug=False):
         self.out_format = out_format
         self.n_volumns= n_volumns
         self.debug = debug
 
         nltk.download('punkt')
         
-        # Load documents into a long string
-        self.text = self.load_volumns()
+        if txt_path == None:
+            # Load documents into a long string
+            self.text = self.load_volumns()
 
-        # Tokenize into sentences
-        self.sentences = self.build_sentencs()
+            # Tokenize into sentences
+            self.sentences = self.build_sentencs()
+        else:
+            with open(txt_path, 'r') as f:
+                self.sentences = [line[: -1] for line in f.readlines()] # remove linebreaks
 
         if self.out_format == 'prompt':
             self.data = self.build_prompts()

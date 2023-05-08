@@ -31,6 +31,9 @@ data/*/*
 pretrained
 code/models/commonlit
 
+# Results
+results
+
 # sh
 *.err
 *.out
