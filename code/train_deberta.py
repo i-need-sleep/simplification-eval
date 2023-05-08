@@ -15,6 +15,7 @@ def run(args):
     if args.debug:
         args.stage = 'pretrain_1'
         args.batch_size = 3
+        args.batch_size_dev = 3
         args.n_epoch = 1
 
     print(args)
@@ -26,7 +27,7 @@ def run(args):
 
     # Setup Tensorboard
     date_str = str(datetime.datetime.now())[:-7].replace(':','-')
-    writer = SummaryWriter(log_dir=f'../result/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=args)
+    writer = SummaryWriter(log_dir=f'{uglobals.RESULTS_DIR}/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=args)
 
     # Training setup
     model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device)
@@ -79,6 +80,20 @@ def run(args):
         print(f'Dev loss: {dev_loss}')
         writer.add_scalar('loss/dev', dev_loss, n_iter)
 
+        # Save
+        try:
+            os.makedirs(f'{uglobals.CHECKPOINTS_DIR}/{args.name}')
+        except:
+            pass
+        save_dir = f'{uglobals.CHECKPOINTS_DIR}/{args.name}/lr{args.lr}_{epoch}_{batch_idx}_{dev_loss}.bin'
+        print(f'Saving at: {save_dir}')
+        torch.save({
+            'epoch': epoch,
+            'step': n_iter,
+            'model_state_dict': model.state_dict(),
+            'optimizer_bert_state_dict': optimizer.state_dict(),
+            }, save_dir)
+
 def train_step(batch, model, optimizer, criterion, device):
     model.train()
     optimizer.zero_grad()
@@ -97,13 +112,10 @@ def train_step(batch, model, optimizer, criterion, device):
 
     # Loss
     loss = criterion(pred, scores)
-    print(loss)
 
     # Backward
     loss.backward()
     optimizer.step()
-
-    exit()
 
     return loss
     

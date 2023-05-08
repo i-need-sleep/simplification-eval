@@ -174,12 +174,17 @@ def aggregate_dfs(paths, out_path, dev_ratio=0.1):
     # Concat dfs
     dfs = [pd.read_csv(path) for path in paths]
     df = pd.concat(dfs)
+
+    # Normalize
+    df.iloc[:,3: ] = df.iloc[:, 3:].apply(lambda x: (x-x.mean())/ x.std(), axis=0)
+
     # Split train/dev sets and save 
     df = df.sample(frac=1)
     dev_idx = int(round(len(df) * dev_ratio))
     
     dev_df = df.iloc[: dev_idx]
     train_df = df.iloc[dev_idx: ]
+
     dev_df.to_csv(f'{out_path}/dev.csv', index=False)
     train_df.to_csv(f'{out_path}/train.csv', index=False)
     
@@ -203,7 +208,17 @@ class PretrainingStage1Dataset(Dataset):
 
         out = {
             'sent': sent,
-            'scores': [line['self_bleu'], line['self_bertscore'], line['sbert'], line['src_perplexity'], line['pred_perplexity'], line['src_syllable_per_word'], line['pred_syllable_per_word'], line['commonlit_src'], line['commonlit_pred']]
+            'scores': [
+                line['self_bleu'], 
+                line['self_bertscore'], 
+                line['sbert'], 
+                line['src_perplexity'], 
+                line['pred_perplexity'], 
+                line['src_syllable_per_word'], 
+                line['pred_syllable_per_word'], 
+                line['commonlit_src'], 
+                line['commonlit_pred']
+            ]
         }
         # Make masks for available scores
         score_mask = [0 for i in range(self.n_supervision)]
