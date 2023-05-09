@@ -10,10 +10,11 @@ from transformers import AdamW
 import utils.globals as uglobals
 from models.deberta_for_eval import DebertaForEval
 from utils.pretrain_stage_1_data_utils import make_pretraining_loader
+from utils.pretrain_stage_2_data_utils import make_pretraining_stage2_loader
 
 def run(args):
     if args.debug:
-        args.stage = 'pretrain_1'
+        args.stage = 'pretrain_2'
         args.batch_size = 3
         args.batch_size_dev = 3
         args.n_epoch = 1
@@ -43,14 +44,16 @@ def run(args):
     # Data loaders for the current stage
     if args.stage == 'pretrain_1':
         train_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/train.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv', model.tokenizer, args.batch_size_dev)
+        dev_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+    elif args.stage == 'pretrain_2':
+        train_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/train.csv', model.tokenizer, args.batch_size)
+        dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     else:
         raise NotImplementedError
 
     n_iter = 0
     n_prev_iter = 0
     running_loss = 0
-    best_dev_loss = 0
     for epoch in range(args.n_epoch):
         # Train
         for batch_idx, batch in enumerate(train_loader):
@@ -67,7 +70,7 @@ def run(args):
         n_prev_iter = n_iter
         running_loss = 0
 
-        if epoch % 3 == 0:
+        if epoch % 4 == 0:
             # Eval
             dev_loss = 0
             for batch_idx, batch in enumerate(dev_loader):

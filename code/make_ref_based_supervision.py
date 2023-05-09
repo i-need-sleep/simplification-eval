@@ -27,7 +27,6 @@ class RefBasedSupervision():
         sari = self.make_sari(srcs, preds, refs)
 
         write_path = path.replace('.csv', '_ref_based.csv')
-        print(bleu, bertscore, sari)
         df = pd.DataFrame({
             'src': srcs,
             'pred': preds,

@@ -1,6 +1,8 @@
 import os
 
 import pandas as pd
+import torch
+from torch.utils.data import Dataset, DataLoader
 
 import utils.globals as uglobals
 
@@ -96,3 +98,110 @@ def aggregated_ref_csvs():
         dfs.append(pd.read_csv(f'{uglobals.STAGE2_OUTPUTS_DIR}/referenced/{file_name}'))
     df = pd.concat(dfs)
     df.to_csv(f'{uglobals.STAGE2_OUTPUTS_DIR}/aggregated.csv', index=False)
+
+def stage2_aggregate_csvs(ref_free_path, ref_based_path, commonlit_src_path, commonlit_pred_path, out_path):
+    ref_free_df = pd.read_csv(ref_free_path)
+    ref_based_df = pd.read_csv(ref_based_path)
+    commonlit_src_df = pd.read_csv(commonlit_src_path)
+    commonlit_pred_df = pd.read_csv(commonlit_pred_path)
+
+    out = {
+        'src': ref_free_df['src'].tolist(),
+        'pred': ref_free_df['pred'].tolist(),
+        'ref': ref_based_df['ref'].tolist(),
+        'self_bleu': ref_free_df['self_bleu'].tolist(),
+        'self_bertscore': ref_free_df['self_bertscore'].tolist(),
+        'sbert': ref_free_df['sbert'].tolist(),
+        'src_perplexity': ref_free_df['src_perplexity'].tolist(),
+        'pred_perplexity': ref_free_df['pred_perplexity'].tolist(),
+        'src_syllable_per_word': ref_free_df['src_syllable_per_word'].tolist(),
+        'pred_syllable_per_word': ref_free_df['pred_syllable_per_word'].tolist(),
+        'commonlit_src': commonlit_src_df['target'].tolist(),
+        'commonlit_pred': commonlit_pred_df['target'].tolist(),
+        'bleu': ref_based_df['bleu'].tolist(),
+        'bertscore': ref_based_df['bertscore'].tolist(),
+        'sari': ref_based_df['sari'].tolist(),
+    }
+    pd.DataFrame(out).to_csv(out_path, index=False)
+    return
+
+def make_splits(path, dev_ratio=0.1):
+    df = pd.read_csv(path)
+
+    # Normalize
+    df.iloc[:, 3: ] = df.iloc[:, 3:].apply(lambda x: (x-x.mean())/ x.std(), axis=0)
+
+    # Split train/dev sets and save 
+    df = df.sample(frac=1)
+    dev_idx = int(round(len(df) * dev_ratio))
+    
+    dev_df = df.iloc[: dev_idx]
+    train_df = df.iloc[dev_idx: ]
+
+    dev_df.to_csv(path.replace('.csv', '_dev.csv'), index=False)
+    train_df.to_csv(path.replace('.csv', '_train.csv'), index=False)
+    return
+
+class PretrainingStage2Dataset(Dataset):
+    def __init__(self, aggregated_path, tokenizer):
+        self.n_supervision = 13 # The total of the supervision signals (the number of regression heads) including the ones to be filled as 0
+
+        self.df = pd.read_csv(aggregated_path)
+        self.tokenizer = tokenizer
+
+    def __len__(self):
+        return len(self.df) 
+
+    def __getitem__(self, i):
+        line = self.df.iloc[i]
+        
+        # Concat src and pred 
+        sent = str(line['src']) + ' ' + self.tokenizer.sep_token + ' ' + str(line['pred'])
+
+        out = {
+            'sent': sent,
+            'scores': [
+                line['self_bleu'], 
+                line['self_bertscore'], 
+                line['sbert'], 
+                line['src_perplexity'], 
+                line['pred_perplexity'], 
+                line['src_syllable_per_word'], 
+                line['pred_syllable_per_word'], 
+                line['commonlit_src'], 
+                line['commonlit_pred'],
+                line['bleu'], 
+                line['bertscore'], 
+                line['sari']
+            ]
+        }
+        # Make masks for available scores
+        score_mask = [0 for i in range(self.n_supervision)]
+        for i in range(len(out['scores'])):
+            score_mask[i] = 1
+        out['score_mask'] = score_mask
+
+        # Zero-pad for SARI, referenced BLEU/BERTScore, Human Ratings
+        while len(out['scores']) < self.n_supervision:
+            out['scores'].append(0)
+        return out
+    
+
+def mr_collate(batch):
+    for idx, line in enumerate(batch):
+        if idx == 0:
+            sent = [line['sent']]
+            scores = torch.tensor(line['scores']).unsqueeze(0)
+            score_mask = torch.tensor(line['score_mask']).unsqueeze(0)
+        else:
+            sent.append(line['sent'])
+            scores = torch.cat((scores, torch.tensor(line['scores']).unsqueeze(0)), dim=0).float()
+            score_mask = torch.cat((score_mask, torch.tensor(line['score_mask']).unsqueeze(0)), dim=0).float()
+    return sent, scores, score_mask
+    
+def make_pretraining_stage2_loader(path, tokenizer, batch_size, shuffle=True):
+    dataset = PretrainingStage2Dataset(path, tokenizer)
+    print(f'Making dataloader: {path}')
+    print(f'# samples: {len(dataset)}')
+    loader = DataLoader(dataset, batch_size=batch_size ,shuffle=shuffle, collate_fn=mr_collate)
+    return loader
