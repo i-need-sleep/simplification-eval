@@ -129,7 +129,7 @@ def convert_for_commonlit(path):
         'license': ['' for _ in indices],
         'excerpt': srcs,
     })
-    df_src.to_csv(path.replace('csv', '_commonlit_src.csv'), index=False)
+    df_src.to_csv(path.replace('.csv', '_commonlit_src.csv'), index=False)
 
     df_pred = pd.DataFrame({
         'id': indices,
@@ -137,7 +137,7 @@ def convert_for_commonlit(path):
         'license': ['' for _ in indices],
         'excerpt': preds,
     })
-    df_pred.to_csv(path.replace('csv', '_commonlit_pred.csv'))
+    df_pred.to_csv(path.replace('.csv', '_commonlit_pred.csv'))
 
 def muss_to_csv(path):
     with open(path, 'r', encoding='utf-8') as f:

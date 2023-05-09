@@ -67,32 +67,33 @@ def run(args):
         n_prev_iter = n_iter
         running_loss = 0
 
-        # Eval
-        dev_loss = 0
-        for batch_idx, batch in enumerate(dev_loader):
-            if args.debug and batch_idx > 3:
-                break
-            
-            dev_loss_iter = eval_step(batch, model, criterion, device)
-            dev_loss += dev_loss_iter.detach()
+        if epoch % 3 == 0:
+            # Eval
+            dev_loss = 0
+            for batch_idx, batch in enumerate(dev_loader):
+                if args.debug and batch_idx > 3:
+                    break
+                
+                dev_loss_iter = eval_step(batch, model, criterion, device)
+                dev_loss += dev_loss_iter.detach()
 
-        dev_loss = dev_loss / len(dev_loader)
-        print(f'Dev loss: {dev_loss}')
-        writer.add_scalar('loss/dev', dev_loss, n_iter)
+            dev_loss = dev_loss / len(dev_loader)
+            print(f'Dev loss: {dev_loss}')
+            writer.add_scalar('loss/dev', dev_loss, n_iter)
 
-        # Save
-        try:
-            os.makedirs(f'{uglobals.CHECKPOINTS_DIR}/{args.name}')
-        except:
-            pass
-        save_dir = f'{uglobals.CHECKPOINTS_DIR}/{args.name}/lr{args.lr}_{epoch}_{batch_idx}_{dev_loss}.bin'
-        print(f'Saving at: {save_dir}')
-        torch.save({
-            'epoch': epoch,
-            'step': n_iter,
-            'model_state_dict': model.state_dict(),
-            'optimizer_bert_state_dict': optimizer.state_dict(),
-            }, save_dir)
+            # Save
+            try:
+                os.makedirs(f'{uglobals.CHECKPOINTS_DIR}/{args.name}')
+            except:
+                pass
+            save_dir = f'{uglobals.CHECKPOINTS_DIR}/{args.name}/lr{args.lr}_{epoch}_{batch_idx}_{dev_loss}.bin'
+            print(f'Saving at: {save_dir}')
+            torch.save({
+                'epoch': epoch,
+                'step': n_iter,
+                'model_state_dict': model.state_dict(),
+                'optimizer_bert_state_dict': optimizer.state_dict(),
+                }, save_dir)
 
 def train_step(batch, model, optimizer, criterion, device):
     model.train()

@@ -8,8 +8,8 @@ import nltk
 import utils.globals as uglobals
 
 class Augment():
-    def __init__(self):
-        self.augment_ratio = 0.4 # augment_size/original_size
+    def __init__(self, augment_ratio = 0.4):
+        self.augment_ratio = augment_ratio # augment_size/original_size
 
         self.aug_methods = [self.deletion, self.swap, self.scramble]
         self.aug_probs = [0.3, 0.3, 0.4] # For each method
@@ -75,7 +75,7 @@ class Augment():
         out = augment_method(src, pred)
         return out
 
-def augment_preds(augment, paths):
+def augment_preds(augment, paths, save_path=None):
     
     # Concat into [src, ...], [pred, ...]
     for path_idx, path in enumerate(paths):
@@ -102,12 +102,60 @@ def augment_preds(augment, paths):
         'pred': augmented_out 
     })
 
-    save_path = f'{uglobals.PROCESSED_DIR}/openwebtext/augmented.csv'
-    df.to_csv(save_path)
-    print(f'Saved at {save_path}')
-    return
+    if save_path != None:
+        df.to_csv(save_path)
+        print(f'Saved at {save_path}')
+    return df
+
+def augment_preds_refs(augment, paths, save_path=None):
+    
+    # Concat into [src, ...], [pred, ...]
+    for path_idx, path in enumerate(paths):
+        print(path)
+        df = pd.read_csv(path)
+        if path_idx == 0:
+            srcs = df['src'].tolist()
+            preds = df['pred'].tolist()
+            refs = df['ref'].tolist()
+        else:
+            srcs = srcs + df['src'].tolist()
+            preds = preds + df['pred'].tolist()
+            refs = refs + df['ref'].tolist()
+
+    # Apply augmentation
+    srcs_out, augmented_out, refs_out = [], [], []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        src, augmented = augment.apply_augmentation(src, pred)
+        if augmented == None:
+            continue
+        srcs_out.append(src)
+        refs_out.append(ref)
+        augmented_out.append(augmented)
+
+    df = pd.DataFrame({
+        'src': srcs_out,
+        'pred': augmented_out,
+        'ref': refs_out
+    })
+
+    if save_path != None:
+        df.to_csv(save_path)
+        print(f'Saved at {save_path}')
+    return df
 
 if __name__ == '__main__':
-    paths = [f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_turbo.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_curie.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/muss.csv']
-    augment = Augment()
-    augment_preds(augment, paths)
+    paths = [f'{uglobals.STAGE2_OUTPUTS_DIR}/aggregated.csv']
+
+    augment = Augment(augment_ratio = 1)
+    aug_df = augment_preds_refs(augment, paths)
+
+    df = pd.read_csv(paths[0])
+
+    df_out = pd.DataFrame({
+        'src': df['src'].tolist() + aug_df['src'].tolist(),
+        'pred': df['pred'].tolist() + aug_df['pred'].tolist(),
+        'ref': df['ref'].tolist() + aug_df['ref'].tolist(),
+    })
+
+    save_path = f'{uglobals.STAGE2_OUTPUTS_DIR}/aggregated_augmented.csv'
+    df_out.to_csv(save_path, index=False)

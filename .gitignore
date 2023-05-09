@@ -30,6 +30,7 @@ data/*/*
 *.model
 pretrained
 code/models/commonlit
+code/models/easse
 
 # Results
 results
