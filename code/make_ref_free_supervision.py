@@ -123,7 +123,7 @@ class RefFreeSupervision():
         return src_scores, pred_scores
 
 if __name__ == '__main__':
-    paths = [f'{uglobals.PROCESSED_DIR}/openwebtext/muss.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/gpt_curie.csv', f'{uglobals.PROCESSED_DIR}/openwebtext/augmented.csv']
+    paths = [f'{uglobals.STAGE2_OUTPUTS_DIR}/aggregated_augmented.csv']
     supervisor = RefFreeSupervision()
     supervisor.make_ref_free_supervisions(paths)
     
