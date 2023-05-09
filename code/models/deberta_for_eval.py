@@ -12,14 +12,14 @@ class DebertaForEval(torch.nn.Module):
         self.deberta = AutoModel.from_pretrained(model_path)
 
         # self.regression_heads = torch.nn.ModuleList([torchvision.ops.MLP(1536, [512, 1], dropout=0.05) for _ in range(n_supervision)]) Somehow this breaks the computation graph when used in conjunction with torch.cat
-        self.regression_heads_layer_1 = torch.nn.ModuleList([torch.nn.Linear(1536, 512) for i in range(n_supervision)])
+        self.regression_heads_layer_1 = torch.nn.ModuleList([torch.nn.Linear(768, 512) for i in range(n_supervision)])
         self.regression_heads_layer_2 = torch.nn.ModuleList([torch.nn.Linear(512, 1) for i in range(n_supervision)])
         self.relu = torch.nn.ReLU()
 
         self.to(device)
     
     def forward(self, sents):
-        tokenized = self.tokenizer(sents, padding=True, truncation=True)
+        tokenized = self.tokenizer(sents, padding=True, truncation=True, max_length=512)
         input_ids = torch.tensor(tokenized['input_ids']).to(self.device)
         token_type_ids =  torch.tensor(tokenized['token_type_ids']).to(self.device)
         attention_mask =  torch.tensor(tokenized['attention_mask']).to(self.device)
