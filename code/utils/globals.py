@@ -16,6 +16,10 @@ STAGE2_OUTPUTS_DIR = f'{STAGE2_DIR}/outputs'
 DRESS_DIR = f'{STAGE2_OUTPUTS_DIR}/dress'
 STAGE2_RAW = f'{STAGE2_DIR}/raw'
 
+# Stage 3
+STAGE3_DIR = f'{DATA_DIR}/stage3'
+STAGE3_PROCESSED_DIR = f'{STAGE3_DIR}/processed'
+
 # Results
 RESULTS_DIR = '../results'
 CHECKPOINTS_DIR = f'{RESULTS_DIR}/checkpoints'
