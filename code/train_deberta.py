@@ -43,12 +43,15 @@ def run(args):
             optimizer.load_state_dict(torch.load(args.checkpoint, map_location=device)['optimizer_bert_state_dict'])
 
     # Data loaders for the current stage
+    eval_n_epoch = 1
     if args.stage == 'pretrain_1':
         train_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        eval_n_epoch = 4
     elif args.stage == 'pretrain_2':
         train_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        eval_n_epoch = 4
     elif args.stage == 'finetune_simpeval':
         train_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
@@ -83,7 +86,7 @@ def run(args):
         n_prev_iter = n_iter
         running_loss = 0
 
-        if epoch % 4 == 0:
+        if epoch % eval_n_epoch == 0:
             # Eval
             dev_loss = 0
             for batch_idx, batch in enumerate(dev_loader):
