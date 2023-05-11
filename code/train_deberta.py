@@ -39,7 +39,8 @@ def run(args):
     if args.checkpoint != '':
         print(f'loading checkpoint: {args.checkpoint}')
         model.load_state_dict(torch.load(args.checkpoint, map_location=device)['model_state_dict'])
-        optimizer.load_state_dict(torch.load(args.checkpoint, map_location=device)['optimizer_state_dict'])
+        if args.cont_training:
+            optimizer.load_state_dict(torch.load(args.checkpoint, map_location=device)['optimizer_bert_state_dict'])
 
     # Data loaders for the current stage
     if args.stage == 'pretrain_1':
@@ -164,6 +165,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', default=3e-5, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str)
+    parser.add_argument('--cont_training', action='store_true')
 
     args = parser.parse_args()
 
