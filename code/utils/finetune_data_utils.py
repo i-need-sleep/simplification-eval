@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
 
 import utils.globals as uglobals
 
@@ -152,3 +153,36 @@ def make_finetuning_loader(path, tokenizer, batch_size, shuffle=True):
     print(f'# samples: {len(dataset)}')
     loader = DataLoader(dataset, batch_size=batch_size ,shuffle=shuffle, collate_fn=mr_collate)
     return loader
+
+def test_bleurt_simpeval_2022():
+    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simpeval_2022.csv')
+    processed_df = pd.read_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_2022.csv')
+
+    preds = processed_df['pred'].tolist()
+    refs  = []
+    for i in range(len(df)):
+        line = df.iloc[i]
+        print(line['system'])
+        if line['system'] == 'asset.test.simp':
+            refs.append(line['generation'])
+    
+    print(len(preds))
+    print(len(refs))
+    exit()
+    
+    # Get BLEURT scores
+    checkpoint = f'lucadiliello/{checkpoint}'
+
+    bleurt = BleurtForSequenceClassification.from_pretrained(checkpoint) 
+    device = torch.device('cpu')
+    bleurt.to(device)
+    bleurt.eval()
+    tokenizer = BleurtTokenizer.from_pretrained(checkpoint)
+
+    out = [] # [score, ...]
+
+    with torch.no_grad():
+        inputs = tokenizer(text_inputs, [self.ref for _ in text_inputs], padding='longest', return_tensors='pt').to(self.device)
+        out = bleurt(**inputs).logits.flatten().cpu()
+        out = out.tolist()
+    
