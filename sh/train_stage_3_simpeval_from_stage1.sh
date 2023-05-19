@@ -22,7 +22,7 @@ source /apps/local/anaconda3/bin/activate tim          # 调用 virtual env
 python -u train_deberta.py \
     --name train_stage_3_simpeval_from_stage1 \
     --stage finetune_simpeval \
-    --lr 3e-5 \
+    --lr 3e-6 \
     --batch_size 10 \
     --batch_size_dev 5 \
     --n_epoch 20 \
