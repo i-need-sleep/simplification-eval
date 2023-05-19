@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=train_stage_1_3e-5_smaller       # 任务名
+#SBATCH --job-name=train_stage_1_3e-5_linear       # 任务名
 #SBATCH --nodes=1                   # 这里不用动 多节点脚本请查官方文档
 #SBATCH --ntasks=1                  # 这里不用动 多任务脚本请查官方文档
 #SBATCH --cpus-per-task=4           # 要几块CPU (一般4块就够用了)
@@ -20,9 +20,10 @@ cd /l/users/yichen.huang/simplification-eval/code   # 切到程序目录
 echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate tim          # 调用 virtual env
 python -u train_deberta.py \
-    --name stage_1_3e-5_smaller \
+    --name stage_1_3e-5_linear \
     --stage pretrain_1 \
-    --batch_size 4 \
-    --batch_size_dev 1 \
-    --lr 3e-5
+    --lr 3e-5 \
+    --batch_size 10 \
+    --batch_size_dev 5 \
+    --head_type linear
 echo "FINISH"                       # 输出起始信息

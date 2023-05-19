@@ -32,7 +32,7 @@ def run(args):
     writer = SummaryWriter(log_dir=f'{uglobals.RESULTS_DIR}/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=args)
 
     # Training setup
-    model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device)
+    model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
     criterion = torch.nn.MSELoss()
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
@@ -67,6 +67,8 @@ def run(args):
         dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_simplicity.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     else:
         raise NotImplementedError
+    if args.save_epoch > 0:
+        eval_n_epoch = args.save_epoch
 
     n_iter = 0
     n_prev_iter = 0
@@ -174,6 +176,8 @@ if __name__ == '__main__':
 
     # Formulation
     parser.add_argument('--stage', type=str)
+    parser.add_argument('--head_type', default='mlp', type=str)
+    parser.add_argument('--save_epoch', default=0, type=int)
 
     # Training
     parser.add_argument('--batch_size', default=32, type=int)

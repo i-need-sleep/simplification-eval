@@ -20,11 +20,12 @@ cd /l/users/yichen.huang/simplification-eval/code   # 切到程序目录
 echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate tim          # 调用 virtual env
 python -u train_deberta.py \
-    --name train_stage_3_simpeval_pretrained \
+    --name train_stage_3_simpeval_pretrained_3e-7 \
     --stage finetune_simpeval \
-    --lr 3e-5 \
+    --lr 3e-7 \
     --batch_size 10 \
     --batch_size_dev 5 \
-    --n_epoch 20 \
-    --checkpoint ../results/checkpoints/stage_2_3e-5_from_stage1/lr3e-05_56_563_0.08732355386018753.bin
+    --n_epoch 100 \
+    --checkpoint ../results/checkpoints/stage_2_3e-5_from_stage1/lr3e-05_56_563_0.08732355386018753.bin \
+    --save_epoch 5
 echo "FINISH"                       # 输出起始信息
