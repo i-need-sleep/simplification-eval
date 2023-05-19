@@ -4,7 +4,8 @@ import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
+from scipy.stats import pearsonr
+import evaluate
 
 import utils.globals as uglobals
 
@@ -154,24 +155,13 @@ def make_finetuning_loader(path, tokenizer, batch_size, shuffle=True):
     loader = DataLoader(dataset, batch_size=batch_size ,shuffle=shuffle, collate_fn=mr_collate)
     return loader
 
-def test_bleurt_simpeval_2022():
-    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simpeval_2022.csv')
-    processed_df = pd.read_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_2022.csv')
+def test_bleurt(path):
+    from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
 
-    preds = processed_df['pred'].tolist()
-    refs  = []
-    for i in range(len(df)):
-        line = df.iloc[i]
-        print(line['system'])
-        if line['system'] == 'asset.test.simp':
-            refs.append(line['generation'])
-    
-    print(len(preds))
-    print(len(refs))
-    exit()
+    df = pd.read_csv(path)
     
     # Get BLEURT scores
-    checkpoint = f'lucadiliello/{checkpoint}'
+    checkpoint = f'lucadiliello/BLEURT-20-D12'
 
     bleurt = BleurtForSequenceClassification.from_pretrained(checkpoint) 
     device = torch.device('cpu')
@@ -179,10 +169,180 @@ def test_bleurt_simpeval_2022():
     bleurt.eval()
     tokenizer = BleurtTokenizer.from_pretrained(checkpoint)
 
-    out = [] # [score, ...]
+    with torch.no_grad():
+        inputs = tokenizer(df['pred'].tolist(), df['ref'].tolist(), padding='longest', return_tensors='pt').to(device)
+        bleurt_scores = bleurt(**inputs).logits.flatten().cpu().tolist()
+    
+    # Pearson Corrlation
+    pearson = pearsonr(bleurt_scores, df['score']).statistic
+    print(f'Pearson correlation: {pearson}')
+
+    # kendall tau-like
+    kendall = get_concordant_discordant(bleurt_scores, df['score'])
+    print(f'Kendall Tau-like: {kendall}')
+
+def get_concordant_discordant(a, b):
+    con = 0
+    dis = 0
+    for i in range(len(a)):
+        for j in range(i, len(a)):
+            if (a[j] - a[i]) * (b[j] - b[i]) > 0:
+                con += 1
+            else:
+                dis += 1
+    return (con - dis) / (con + dis)
+    
+def resolve_reference(src_path, processed_path):
+    src_df = pd.read_csv(src_path)
+    processed_df = pd.read_csv(processed_path)
+    
+    ref = []
+    for i in range(len(processed_df)):
+        src = processed_df.iloc[i]['src']
+        for j in range(len(src_df)):
+            if src_df.iloc[j]['original'] == src and src_df.iloc[j]['system'] == 'Human 1 Writing':
+                ref.append(src_df.iloc[j]['generation'])
+                break
+    
+    out = {
+        'src': processed_df['src'].tolist(),
+        'pred': processed_df['pred'].tolist(),
+        'score': processed_df['score'].tolist(),
+        'ref': ref
+        }
+    pd.DataFrame(out).to_csv(processed_path)
+
+def resolve_reference_da(src_path, processed_path):
+    src_df = pd.read_excel(src_path)
+    processed_df = pd.read_csv(processed_path)
+    
+    ref = []
+    for i in range(len(processed_df)):
+        src = processed_df.iloc[i]['src']
+        for j in range(len(src_df)):
+            # Dirty fix
+            if src[: 4] == 'Bone':
+                ref.append('Bone has published books which include recipes by foragers, mycologists, and chefs that involve mushroom-based dishes.')
+                break
+            elif 'In a difficult situation' in src:
+                ref.append('A hard situation encouraged him to study Graphic Design in 2007. Since then, he?€?s been a Cinematographer in the film industry. He also has a lot of experience with photography and graphic design.')
+                break
+            elif src_df.iloc[j]['Input.original'] == src and src_df.iloc[j]['Input.system'] == 'Human 1 Writing':
+                ref.append(src_df.iloc[j]['Input.simplified'])
+                break
+        if len(ref) == i:
+            print(src)
+            raise
+    
+    out = {
+        'src': processed_df['src'].tolist(),
+        'pred': processed_df['pred'].tolist(),
+        'score': processed_df['score'].tolist(),
+        'ref': ref
+        }
+    pd.DataFrame(out).to_csv(processed_path)
+
+def test_lens(path):
+    import lens
+    from lens.lens_score import LENS
+
+    df = pd.read_csv(path)
+    
+    # Get BLEURT scores
+    metric = LENS(uglobals.LENS_DIR, rescale=True)
 
     with torch.no_grad():
-        inputs = tokenizer(text_inputs, [self.ref for _ in text_inputs], padding='longest', return_tensors='pt').to(self.device)
-        out = bleurt(**inputs).logits.flatten().cpu()
-        out = out.tolist()
+        lens_scores = metric.score(df['src'].tolist(), df['pred'].tolist(), [[ref] for ref in df['ref'].tolist()], batch_size=8, gpus=0)
     
+    # Pearson Corrlation
+    pearson = pearsonr(lens_scores, df['score']).statistic
+    print(f'Pearson correlation: {pearson}')
+
+    # kendall tau-like
+    kendall = get_concordant_discordant(lens_scores, df['score'])
+    print(f'Kendall Tau-like: {kendall}')
+
+def test_sari(path):
+    from easse.sari import corpus_sari
+
+    df = pd.read_csv(path)
+    
+    scores = []
+    for i in range(len(df)):
+        src = df.iloc[i]['src']
+        pred = df.iloc[i]['pred']
+        ref = df.iloc[i]['ref']
+        score = corpus_sari(orig_sents=[src], sys_sents=[pred], refs_sents=[[ref]])
+        scores.append(score)
+    
+    # Pearson Corrlation
+    pearson = pearsonr(scores, df['score']).statistic
+    print(f'Pearson correlation: {pearson}')
+
+    # kendall tau-like
+    kendall = get_concordant_discordant(scores, df['score'])
+    print(f'Kendall Tau-like: {kendall}')
+
+def test_bleu(path):
+
+    df = pd.read_csv(path)
+    bleu = evaluate.load('bleu')
+    
+    scores = []
+    for i in range(len(df)):
+        src = df.iloc[i]['src']
+        pred = df.iloc[i]['pred']
+        ref = df.iloc[i]['ref']
+        score = bleu.compute(predictions = [pred], references = [ref])['bleu']
+        scores.append(score)
+    
+    # Pearson Corrlation
+    pearson = pearsonr(scores, df['score']).statistic
+    print(f'Pearson correlation: {pearson}')
+
+    # kendall tau-like
+    kendall = get_concordant_discordant(scores, df['score'])
+    print(f'Kendall Tau-like: {kendall}')
+
+def test_bertscore(path):
+
+    df = pd.read_csv(path)
+    bertscore = evaluate.load('bertscore')
+    
+    scores = []
+    for i in range(len(df)):
+        src = df.iloc[i]['src']
+        pred = df.iloc[i]['pred']
+        ref = df.iloc[i]['ref']
+        score = bertscore.compute(predictions = [pred], references = [ref], lang='en')['f1'][0]
+        scores.append(score)
+    
+    # Pearson Corrlation
+    pearson = pearsonr(scores, df['score']).statistic
+    print(f'Pearson correlation: {pearson}')
+
+    # kendall tau-like
+    kendall = get_concordant_discordant(scores, df['score'])
+    print(f'Kendall Tau-like: {kendall}')
+
+def test_FKGL(path):
+    import textstat
+
+    df = pd.read_csv(path)
+    bertscore = evaluate.load('bertscore')
+    
+    scores = []
+    for i in range(len(df)):
+        src = df.iloc[i]['src']
+        pred = df.iloc[i]['pred']
+        ref = df.iloc[i]['ref']
+        score = textstat.syllable_count(pred) / textstat.lexicon_count(pred)
+        scores.append(score)
+    
+    # Pearson Corrlation
+    pearson = pearsonr(scores, df['score']).statistic
+    print(f'Pearson correlation: {pearson}')
+
+    # kendall tau-like
+    kendall = get_concordant_discordant(scores, df['score'])
+    print(f'Kendall Tau-like: {kendall}')
