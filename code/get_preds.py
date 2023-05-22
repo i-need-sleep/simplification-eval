@@ -23,8 +23,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--method', default='save_txt', type=str)  
     # parser.add_argument('--txt_path', default=f'{uglobals.STAGE2_RAW}/stage2_raw.en', type=str)  
-    parser.add_argument('--txt_path', default=f'{uglobals.PROCESSED_DIR}/stage1_raw.en', type=str)  
-    parser.add_argument('--out_dir', default=uglobals.STAGE2_OUTPUTS_DIR, type=str)  
+    parser.add_argument('--txt_path', default=f'{uglobals.PROCESSED_DIR}/openwebtext/stage1_raw.en', type=str)  
+    parser.add_argument('--out_dir', default=f'{uglobals.PROCESSED_DIR}/openwebtext', type=str)  
 
     args = parser.parse_args()
 

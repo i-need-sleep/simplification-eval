@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=stage_1_muss_cpu_shorter       # 任务名
+#SBATCH --job-name=stage_1_split_sents_cpu       # 任务名
 #SBATCH --nodes=1                   # 这里不用动 多节点脚本请查官方文档
 #SBATCH --ntasks=1                  # 这里不用动 多任务脚本请查官方文档
 #SBATCH --cpus-per-task=4           # 要几块CPU (一般4块就够用了)
@@ -13,9 +13,10 @@
 
 nvidia-smi
 nvcc --version
-cd /l/users/yichen.huang/simplification-eval/code/models/muss   # 切到程序目录
+cd /l/users/yichen.huang/simplification-eval/code   # 切到程序目录
 
 echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate tim          # 调用 virtual env
-python -u scripts/simplify.py scripts/original_shorter.en --model-name muss_en_wikilarge_mined
+python -u get_preds.py \
+    --method save_txt
 echo "FINISH"                       # 输出起始信息
