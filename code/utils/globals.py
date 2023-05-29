@@ -13,8 +13,12 @@ SIM_OPENWEBTEXT_DIR = f'{PROCESSED_DIR}/openwebtext'
 # Stage 2
 STAGE2_DIR = f'{DATA_DIR}/stage2'
 STAGE2_OUTPUTS_DIR = f'{STAGE2_DIR}/outputs'
-DRESS_DIR = f'{STAGE2_OUTPUTS_DIR}/dress'
 STAGE2_RAW = f'{STAGE2_DIR}/raw'
+STAGE_2_REFERENCED = f'{STAGE2_OUTPUTS_DIR}/referenced'
+STAGE_2_SYSTEMS = f'{STAGE2_OUTPUTS_DIR}/systems'
+STAGE_2_WIKI_LARGE_REF = f'{STAGE_2_SYSTEMS}/dress/WikiLarge/test/Reference'
+STAGE_2_WIKI_LARGE_SRC = f'{STAGE_2_SYSTEMS}/dress/WikiLarge/test/Complex'
+DRESS_DIR = f'{STAGE_2_SYSTEMS}/dress'
 
 # Stage 3
 STAGE3_DIR = f'{DATA_DIR}/stage3'

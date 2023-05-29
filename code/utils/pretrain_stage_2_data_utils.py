@@ -92,6 +92,35 @@ def dress_to_csv():
                 out_path = f'{uglobals.STAGE2_OUTPUTS_DIR}/referenced/{model_name}_{dataset}.csv'
                 model_preds_to_csv(src_path, pred_path, ref_path, out_path)
 
+def iterative_edits_to_csv():
+    src_path = uglobals.STAGE_2_WIKI_LARGE_SRC
+    ref_path = uglobals.STAGE_2_WIKI_LARGE_REF
+
+    for file_name in os.listdir(f'{uglobals.STAGE_2_SYSTEMS}/iterative_edits'):
+        if 'txt' not in file_name:
+            continue
+        pred_path = f'{uglobals.STAGE_2_SYSTEMS}/iterative_edits/{file_name}'
+        out_path = f'{uglobals.STAGE_2_REFERENCED}/{file_name[:-4]}.csv'
+        model_preds_to_csv(src_path, pred_path, ref_path, out_path)
+
+def unsup_nts_to_csv():
+    src_path = uglobals.STAGE_2_WIKI_LARGE_SRC
+    ref_path = uglobals.STAGE_2_WIKI_LARGE_REF
+
+    for file_name in os.listdir(f'{uglobals.STAGE_2_SYSTEMS}/unsupNTS'):
+        pred_path = f'{uglobals.STAGE_2_SYSTEMS}/unsupNTS/{file_name}'
+        out_path = f'{uglobals.STAGE_2_REFERENCED}/{file_name}.csv'
+        model_preds_to_csv(src_path, pred_path, ref_path, out_path)
+
+def sbmt_sari_to_csv():
+    src_path = uglobals.STAGE_2_WIKI_LARGE_SRC
+    ref_path = uglobals.STAGE_2_WIKI_LARGE_REF
+
+    for file_name in os.listdir(f'{uglobals.STAGE_2_SYSTEMS}/sbmt_sari'):
+        pred_path = f'{uglobals.STAGE_2_SYSTEMS}/sbmt_sari/{file_name}'
+        out_path = f'{uglobals.STAGE_2_REFERENCED}/{file_name}.csv'
+        model_preds_to_csv(src_path, pred_path, ref_path, out_path)
+
 def aggregated_ref_csvs():
     dfs = []
     for file_name in os.listdir(f'{uglobals.STAGE2_OUTPUTS_DIR}/referenced'):
