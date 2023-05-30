@@ -191,7 +191,15 @@ def aggregate_dfs(paths, out_path, dev_ratio=0.1):
 
     dev_df.to_csv(f'{out_path}/dev.csv', index=False)
     train_df.to_csv(f'{out_path}/train.csv', index=False)
-    
+
+def split_df(path, chunk_size):
+    df = pd.read_csv(path)
+    i = 0
+    while i * chunk_size < len(df):
+        df_slice = df.iloc[i * chunk_size: (i +  1) * chunk_size]
+        i += 1
+        
+        df_slice.to_csv(path.replace('.csv', f'_{i}.csv'))
     
 
 class PretrainingStage1Dataset(Dataset):
