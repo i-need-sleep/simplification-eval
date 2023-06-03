@@ -180,7 +180,8 @@ def aggregate_dfs(paths, out_path, dev_ratio=0.1):
     df = pd.concat(dfs)
 
     # Normalize
-    df.iloc[:,3: ] = df.iloc[:, 3:].apply(lambda x: (x-x.mean())/ x.std(), axis=0)
+    starting_idx = df.columns.to_list().index('self_bleu')
+    df.iloc[:, starting_idx: ] = df.iloc[:, starting_idx:].apply(lambda x: (x-x.mean())/ x.std(), axis=0)
 
     # Split train/dev sets and save 
     df = df.sample(frac=1)
