@@ -34,7 +34,17 @@ def run(args):
     # Training setup
     model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
     criterion = torch.nn.MSELoss()
-    optimizer = AdamW(model.parameters(), lr=args.lr)
+
+    if args.freeze_deberta:
+        optimizer_params = []
+        for name, param in model.named_parameters():
+            if 'deberta' not in name:
+                optimizer_params.append(param)
+                print(name)
+        exit()
+    else:
+        optimizer_params = model.parameters()
+    optimizer = AdamW(optimizer_params, lr=args.lr)
 
      # Load checkpoint
     if args.checkpoint != '':
@@ -186,6 +196,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str)
     parser.add_argument('--cont_training', action='store_true')
+    parser.add_argument('--freeze_deberta', action='store_true')
 
     args = parser.parse_args()
 
