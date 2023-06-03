@@ -73,7 +73,7 @@ class RefBasedSupervision():
         return sari
 
 if __name__ == '__main__':
-    path = f'{uglobals.STAGE2_OUTPUTS_DIR}/aggregated_augmented.csv'
+    path = f'{uglobals.STAGE2_OUTPUTS_DIR}/augmented.csv'
     supervisor = RefBasedSupervision()
     supervisor.make_ref_based_supervision(path)
     

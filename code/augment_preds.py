@@ -144,19 +144,19 @@ def augment_preds_refs(augment, paths, save_path=None):
     return df
 
 if __name__ == '__main__':
-    paths = [f'{uglobals.PROCESSED_DIR}/all_preds.csv']
+    paths = [f'{uglobals.STAGE2_OUTPUTS_DIR}/aggregated.csv']
 
     augment = Augment(augment_ratio = 0.4)
-    # aug_df = augment_preds_refs(augment, paths)
-    aug_df = augment_preds(augment, paths)
+    aug_df = augment_preds_refs(augment, paths)
+    # aug_df = augment_preds(augment, paths)
 
     df = pd.read_csv(paths[0])
 
     df_out = pd.DataFrame({
         'src': df['src'].tolist() + aug_df['src'].tolist(),
         'pred': df['pred'].tolist() + aug_df['pred'].tolist(),
-        # 'ref': df['ref'].tolist() + aug_df['ref'].tolist(),
+        'ref': df['ref'].tolist() + aug_df['ref'].tolist(),
     })
 
-    save_path = f'{uglobals.PROCESSED_DIR}/augmented.csv'
+    save_path = f'{uglobals.STAGE2_OUTPUTS_DIR}/augmented.csv'
     df_out.to_csv(save_path, index=False)

@@ -123,7 +123,7 @@ class RefFreeSupervision():
         return src_scores, pred_scores
 
 if __name__ == '__main__':
-    paths = [f'{uglobals.PROCESSED_DIR}/unscored_splits/augmented_{i}.csv' for i in range(1, 7)]
+    paths = [f'{uglobals.STAGE2_OUTPUTS_DIR}/augmented.csv']
     supervisor = RefFreeSupervision()
     supervisor.make_ref_free_supervisions(paths)
     
