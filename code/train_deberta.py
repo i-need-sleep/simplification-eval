@@ -48,7 +48,7 @@ def run(args):
     if args.stage == 'pretrain_1':
         train_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
-        eval_n_epoch = 4
+        eval_n_epoch = 1
     elif args.stage == 'pretrain_2':
         train_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)

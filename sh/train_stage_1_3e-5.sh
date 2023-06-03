@@ -22,5 +22,7 @@ source /apps/local/anaconda3/bin/activate tim          # 调用 virtual env
 python -u train_deberta.py \
     --name stage_1_3e-5 \
     --stage pretrain_1 \
-    --lr 3e-5
+    --lr 3e-5 \
+    --checkpoint ../results/checkpoints/stage_1_3e-5/lr3e-05_7_1799_0.1176808550953865.bin \
+    --cont_training
 echo "FINISH"                       # 输出起始信息
