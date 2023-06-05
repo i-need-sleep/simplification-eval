@@ -47,24 +47,18 @@ def run(args):
     # Data loaders for the current stage
     eval_n_epoch = 1
     if args.stage == 'pretrain_1':
-        train_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
         eval_n_epoch = 4
     elif args.stage == 'pretrain_2':
-        train_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
         eval_n_epoch = 4
     elif args.stage == 'finetune_simpeval':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_2022.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     elif args.stage == 'finetune_adequacy':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_adquacy.csv', model.tokenizer, args.batch_size)
         dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_test_adquacy.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     elif args.stage == 'finetune_fluency':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_fluency.csv', model.tokenizer, args.batch_size)
         dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_test_fluency.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     elif args.stage == 'finetune_simplicity':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_simplicity.csv', model.tokenizer, args.batch_size)
         dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_test_simplicity.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     else:
         raise NotImplementedError
