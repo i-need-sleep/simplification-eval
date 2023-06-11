@@ -33,7 +33,7 @@ def run(args):
     writer = SummaryWriter(log_dir=f'{uglobals.RESULTS_DIR}/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=args)
 
     # Training setup
-    model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device)
+    model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
     criterion = torch.nn.MSELoss()
     optimizer = AdamW(model.parameters(), lr=args.lr)
 
@@ -53,7 +53,7 @@ def run(args):
         dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
         eval_n_epoch = 4
     elif args.stage == 'finetune_simpeval':
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_2022.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_2022.csv', model.tokenizer, args.batch_size_dev, shuffle=False)  
     elif args.stage == 'finetune_adequacy':
         dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_test_adquacy.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     elif args.stage == 'finetune_fluency':
@@ -74,13 +74,24 @@ def run(args):
 
     human_scores = dev_loader.dataset.df['score'].tolist()
 
-    # Pearson Corrlation
-    pearson = pearsonr(preds, human_scores).statistic
-    print(f'Pearson correlation: {pearson}')
+    # Save predictions
+    save_dir = f'{uglobals.OUTPUTS_DIR}/{args.stage}'
+    save_path = f'{save_dir}/{args.name}.json'
 
-    # kendall tau-like
-    kendall = get_concordant_discordant(preds, human_scores)
-    print(f'Kendall Tau-like: {kendall}')
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    with open(save_path, 'w') as f:
+        json.dump(preds, f)
+    print(f'Saved predictions to {save_path}')
+
+    # # Pearson Corrlation
+    # pearson = pearsonr(preds, human_scores).statistic
+    # print(f'Pearson correlation: {pearson}')
+
+    # # kendall tau-like
+    # kendall = get_concordant_discordant(preds, human_scores)
+    # print(f'Kendall Tau-like: {kendall}')
 
     
 
@@ -108,25 +119,31 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
 
     # Formulation
-    parser.add_argument('--stage', type=str)
+    parser.add_argument('--stage', default='finetune_simpeval', type=str)
+    parser.add_argument('--head_type', default='mlp', type=str)
 
     # Training
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--batch_size_dev', default=4, type=int)
     parser.add_argument('--lr', default=3e-5, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
-    parser.add_argument('--checkpoint', default='../results/checkpoints/simpeval/from_scratch.bin', type=str)
+    parser.add_argument('--checkpoint', default='../results/checkpoints/simpeval/pretrained.bin', type=str)
     parser.add_argument('--cont_training', action='store_true')
 
     args = parser.parse_args()
 
+    args.name = 'from_stage1_linear'
+    args.stage = 'finetune_simpeval'
+    args.checkpoint = '../results/checkpoints/simpeval/from_stage1_linear.bin'
+    args.head_type = 'linear'
 
-    for stage in ['simplicity']:
-        for model in ['from_scratch', 'from_stage1', 'from_stage2']:
-            checkpoint = f'{uglobals.CHECKPOINTS_DIR}/{stage}/{model}.bin'
 
-            args.name = f'{stage}_{model}'
-            args.stage = f'finetune_{stage}'
-            args.checkpoint = checkpoint
+    # for stage in ['simplicity']:
+    #     for model in ['from_scratch', 'from_stage1', 'from_stage2']:
+    #         checkpoint = f'{uglobals.CHECKPOINTS_DIR}/{stage}/{model}.bin'
+
+    #         args.name = f'{stage}_{model}'
+    #         args.stage = f'finetune_{stage}'
+    #         args.checkpoint = checkpoint
             
-            run(args)
+    run(args)

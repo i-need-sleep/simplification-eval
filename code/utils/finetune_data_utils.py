@@ -1,5 +1,6 @@
 import os
 import copy
+import json
 
 import pandas as pd
 import numpy as np
@@ -443,7 +444,9 @@ def test_bleu_simpeval_2022():
     # This should correspond to the tao_all value on Table 2 of the LENS paper
 
     # The BLEU implemntation from Huggingface's evaluate package
-    bleu = evaluate.load('bleu')
+    # bleu = evaluate.load('bleu')
+    from torchmetrics import BLEUScore
+    bleu = BLEUScore()
     
     # SimpEval 2022 as provided in the LENS repo
     df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpeval_2022.xlsx')
@@ -465,7 +468,8 @@ def test_bleu_simpeval_2022():
         refs = df_original[human_generated & same_id]['generation'].tolist()
         
         # Compute BLEU under the default settings
-        score = bleu.compute(predictions = [pred], references = [refs])['bleu']
+        # score = bleu.compute(predictions = [pred], references = [refs])['bleu']
+        score = bleu([pred], [refs]).item()
         scores.append(score)
 
     # Kendall tau-like with pairs where all annotators agree with the ranking order and unormalized score differences > 5
@@ -473,6 +477,7 @@ def test_bleu_simpeval_2022():
     print(f'Kendall Tau-like (filtered pairs): {kendall}')
 
 def get_concordant_discordant_filtered(a, b, min_diff=5):
+
     con = 0
     dis = 0
 
@@ -480,7 +485,7 @@ def get_concordant_discordant_filtered(a, b, min_diff=5):
     # and the unnormalised score difference is larger than 5
 
     # If by that, they mean the score difference is larger than 5 for each annotaor:
-    if True:
+    if False:
         for i in range(len(a)):
             for j in range(0, i):
 
@@ -555,3 +560,109 @@ def get_concordant_discordant_filtered(a, b, min_diff=5):
 
     print(f'Concordant: {con}, discordant: {dis}')
     return (con - dis) / (con + dis)
+
+def test_simpeval_2022(score_function=None, score_path=''):
+    df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpeval_2022.xlsx')
+    df_original = copy.deepcopy(df)
+    # Using Human 1 Writing as the reference and Human 2 Writing as the oracle output
+    filtered_indices = df['system'] != 'Human 1 Writing'
+    df = df[df['system'] != 'Human 1 Writing']
+
+    srcs, preds, refs = [], [], []
+    for i in range(len(df)):
+        src = df.iloc[i]['original']
+        pred = df.iloc[i]['generation']
+
+        # Resolve the reference
+        original_id = df.iloc[i]['original_id']
+        human_generated = df_original['system'].isin(['Human 1 Writing'])
+        same_id = df_original['original_id'] == original_id
+        ref = df_original[human_generated & same_id]['generation'].tolist()
+
+        srcs.append(src)
+        preds.append(pred)
+        refs.append(ref)
+    
+    if score_path == '':
+        scores = score_function(srcs, preds, refs)
+    else:
+        with open(score_path, 'r') as f:
+            scores_in = json.load(f)
+
+        # Filter out the scores of the reference
+        scores = []
+        for i in range(len(scores_in)):
+            if filtered_indices[i]:
+                scores.append(scores_in[i])
+
+    # Kendall tau-like with pairs where all annotators agree with the ranking order and unormalized score differences > 5
+    kendall = get_concordant_discordant_filtered(scores, df)
+    print(f'Kendall Tau-like (filtered pairs): {kendall}')
+
+    # Pearson Corrlation
+    avg_annotator_score = (np.array(df['rating_1_zscore']) + np.array(df['rating_2_zscore']) + np.array(df['rating_3_zscore'])) / 3
+    pearson = pearsonr(scores, avg_annotator_score).statistic
+    print(f'Pearson correlation: {pearson}')
+
+    return
+
+def get_bleu_scores(srcs, preds, refs):
+    from torchmetrics import BLEUScore
+    bleu = BLEUScore()
+
+    scores = []
+    for idx, (pred, ref) in enumerate(zip(preds, refs)):
+        score = bleu([pred], [ref]).item()
+        scores.append(score)
+    return scores
+
+def get_lens_scores(srcs, preds, refs):
+    from lens.lens_score import LENS
+    metric = LENS(uglobals.LENS_DIR, rescale=True)
+    scores = metric.score(srcs, preds, refs, batch_size=8, gpus=0)
+    return scores
+
+def get_sari_scores(srcs, preds, refs):
+    from easse.sari import corpus_sari
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        score = corpus_sari(orig_sents=[src], sys_sents=[pred], refs_sents=[ref])
+        scores.append(score)
+    return scores
+
+def get_bertscores_f1(srcs, preds, refs):
+    bertscore = evaluate.load('bertscore')
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        score = bertscore.compute(predictions = [pred], references = [ref], lang='en')['f1'][0]
+        scores.append(score)
+    return scores
+
+def get_bertscores_precision(srcs, preds, refs):
+    bertscore = evaluate.load('bertscore')
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        score = bertscore.compute(predictions = [pred], references = [ref], lang='en')['precision'][0]
+        scores.append(score)
+    return scores
+
+def get_fkgl(srcs, preds, refs):
+    import textstat
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        score =  score = textstat.syllable_count(pred) / textstat.lexicon_count(pred)
+        scores.append(score)
+    return scores
+
+def get_bleurt_pretrained(srcs, preds, refs, checkpoint='lucadiliello/BLEURT-20-D12'):
+    from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
+    bleurt = BleurtForSequenceClassification.from_pretrained(checkpoint) 
+    device = torch.device('cpu')
+    bleurt.to(device)
+    bleurt.eval()
+    tokenizer = BleurtTokenizer.from_pretrained(checkpoint)
+
+    with torch.no_grad():
+        inputs = tokenizer(preds, [ref[0] for ref in refs], padding='longest', return_tensors='pt').to(device)
+        scores = bleurt(**inputs).logits.flatten().cpu().tolist()
+    return scores
