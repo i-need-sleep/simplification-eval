@@ -1,4 +1,5 @@
 import os
+import copy
 
 import pandas as pd
 import numpy as np
@@ -243,66 +244,110 @@ def resolve_reference_da(src_path, processed_path):
     pd.DataFrame(out).to_csv(processed_path)
 
 def test_lens(path):
-    import lens
     from lens.lens_score import LENS
 
-    df = pd.read_csv(path)
+    try:
+        df = pd.read_csv(path)
+    except:
+        df = pd.read_excel(path)
     
-    # Get BLEURT scores
     metric = LENS(uglobals.LENS_DIR, rescale=True)
 
-    with torch.no_grad():
-        lens_scores = metric.score(df['src'].tolist(), df['pred'].tolist(), [[ref] for ref in df['ref'].tolist()], batch_size=8, gpus=0)
-    
-    # Pearson Corrlation
-    pearson = pearsonr(lens_scores, df['score']).statistic
-    print(f'Pearson correlation: {pearson}')
+    if 'score' in df.columns.tolist():
+        with torch.no_grad():
+            lens_scores = metric.score(df['src'].tolist(), df['pred'].tolist(), [[ref] for ref in df['ref'].tolist()], batch_size=8, gpus=0)
 
-    # kendall tau-like
-    kendall = get_concordant_discordant(lens_scores, df['score'])
-    print(f'Kendall Tau-like: {kendall}')
+        # Pearson Corrlation
+        pearson = pearsonr(lens_scores, df['score']).statistic
+        print(f'Pearson correlation: {pearson}')
+
+        # kendall tau-like
+        kendall = get_concordant_discordant(lens_scores, df['score'])
+        print(f'Kendall Tau-like: {kendall}')
+    else:
+        with torch.no_grad():
+            lens_scores = metric.score(df['original'].tolist(), df['generation'].tolist(), [[ref] for ref in df['ref'].tolist()], batch_size=8, gpus=0)
+
+        # Kendall tau-like with pairs where all annotators agree with the order and unormalized score differences > 5
+        kendall = get_concordant_discordant_filtered(lens_scores, df)
+        print(f'Kendall Tau-like (filtered pairs): {kendall}')
 
 def test_sari(path):
     from easse.sari import corpus_sari
 
-    df = pd.read_csv(path)
+    try:
+        df = pd.read_csv(path)
+    except:
+        df = pd.read_excel(path)
     
-    scores = []
-    for i in range(len(df)):
-        src = df.iloc[i]['src']
-        pred = df.iloc[i]['pred']
-        ref = df.iloc[i]['ref']
-        score = corpus_sari(orig_sents=[src], sys_sents=[pred], refs_sents=[[ref]])
-        scores.append(score)
+    if 'score' in df.columns.tolist():
+        scores = []
+        for i in range(len(df)):
+            src = df.iloc[i]['src']
+            pred = df.iloc[i]['pred']
+            ref = df.iloc[i]['ref']
+            score = corpus_sari(orig_sents=[src], sys_sents=[pred], refs_sents=[[ref]])
+            scores.append(score)
+
+        # Pearson Corrlation
+        pearson = pearsonr(scores, df['score']).statistic
+        print(f'Pearson correlation: {pearson}')
+
+        # kendall tau-like
+        kendall = get_concordant_discordant(scores, df['score'])
+        print(f'Kendall Tau-like: {kendall}')
+    else:
+        scores = []
+        for i in range(len(df)):
+            src = df.iloc[i]['original']
+            pred = df.iloc[i]['generation']
+            ref = df.iloc[i]['ref']
+            score = corpus_sari(orig_sents=[src], sys_sents=[pred], refs_sents=[[ref]])
+            scores.append(score)
+
+        # Kendall tau-like with pairs where all annotators agree with the order and unormalized score differences > 5
+        kendall = get_concordant_discordant_filtered(scores, df)
+        print(f'Kendall Tau-like (filtered pairs): {kendall}')
+
+# def test_bleu(path):
+
+#     bleu = evaluate.load('bleu')
     
-    # Pearson Corrlation
-    pearson = pearsonr(scores, df['score']).statistic
-    print(f'Pearson correlation: {pearson}')
-
-    # kendall tau-like
-    kendall = get_concordant_discordant(scores, df['score'])
-    print(f'Kendall Tau-like: {kendall}')
-
-def test_bleu(path):
-
-    df = pd.read_csv(path)
-    bleu = evaluate.load('bleu')
     
-    scores = []
-    for i in range(len(df)):
-        src = df.iloc[i]['src']
-        pred = df.iloc[i]['pred']
-        ref = df.iloc[i]['ref']
-        score = bleu.compute(predictions = [pred], references = [ref])['bleu']
-        scores.append(score)
+#     try:
+#         df = pd.read_csv(path)
+#     except:
+#         df = pd.read_excel(path)
+        
     
-    # Pearson Corrlation
-    pearson = pearsonr(scores, df['score']).statistic
-    print(f'Pearson correlation: {pearson}')
+#     if 'score' in df.columns.tolist():
+#         scores = []
+#         for i in range(len(df)):
+#             src = df.iloc[i]['src']
+#             pred = df.iloc[i]['pred']
+#             ref = df.iloc[i]['ref']
+#             score = bleu.compute(predictions = [pred], references = [ref])['bleu']
+#             scores.append(score)
 
-    # kendall tau-like
-    kendall = get_concordant_discordant(scores, df['score'])
-    print(f'Kendall Tau-like: {kendall}')
+#         # Pearson Corrlation
+#         pearson = pearsonr(scores, df['score']).statistic
+#         print(f'Pearson correlation: {pearson}')
+
+#         # kendall tau-like
+#         kendall = get_concordant_discordant(scores, df['score'])
+#         print(f'Kendall Tau-like: {kendall}')
+#     else:
+#         scores = []
+#         for i in range(len(df)):
+#             src = df.iloc[i]['original']
+#             pred = df.iloc[i]['generation']
+#             ref = df.iloc[i]['ref']
+#             score = bleu.compute(predictions = [pred], references = [ref])['bleu']
+#             scores.append(score)
+
+#         # Kendall tau-like with pairs where all annotators agree with the order and unormalized score differences > 5
+#         kendall = get_concordant_discordant_filtered(scores, df)
+#         print(f'Kendall Tau-like (filtered pairs): {kendall}')
 
 def test_bertscore(path):
 
@@ -329,7 +374,6 @@ def test_FKGL(path):
     import textstat
 
     df = pd.read_csv(path)
-    bertscore = evaluate.load('bertscore')
     
     scores = []
     for i in range(len(df)):
@@ -346,3 +390,168 @@ def test_FKGL(path):
     # kendall tau-like
     kendall = get_concordant_discordant(scores, df['score'])
     print(f'Kendall Tau-like: {kendall}')
+
+def simp_da_normalize_and_average():
+    df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpDA_2022.xlsx')
+
+    # Normalize for 
+    max_worker_idx = max(df['WorkerId'].tolist())
+
+    for workder_idx in range(max_worker_idx):
+        for measure in ['adequacy', 'fluency', 'simplicity']:
+            mean = np.mean(df[df["WorkerId"] == workder_idx][f'Answer.{measure}'])
+            std = np.std(df[df["WorkerId"] == workder_idx][f'Answer.{measure}'])
+            print(mean, std)
+            df.loc[df["WorkerId"] == workder_idx, f'Answer.{measure}'] = (df[df["WorkerId"] == workder_idx][f'Answer.{measure}'] - mean) / std
+    print(df)
+
+def test_bleu_simpda():
+    from easse.sari import corpus_sari
+
+    bleu = evaluate.load('bleu')
+    
+    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simplicity_DA.csv')
+
+    # Load the reference simplifications
+    refs = [] # [[sent0_ref0, ...], ...]
+    for i in range(10):
+        with open(f'{uglobals.STAGE3_DIR}/asset/asset.test.simp.{i}', encoding='utf-8') as f:
+            data = f.readlines()
+            refs.append(data)
+    
+    scores = []
+    for i in range(len(df)):
+        src = df.iloc[i]['orig_sent']
+        pred = df.iloc[i]['simp_sent']
+        sent_id = df.iloc[i]['sent_id']
+        # ref = [r[sent_id - 1] for r in refs]
+        ref = [[r[sent_id - 1]] for r in refs]
+        # score = bleu.compute(predictions = [pred], references = [ref])['bleu']
+        score = corpus_sari(orig_sents=[src], sys_sents=[pred], refs_sents=ref)
+        scores.append(score)
+
+    # Pearson Corrlation
+    for measure in ['fluency', 'meaning', 'simplicity']:
+        print(measure)
+        pearson = pearsonr(scores, df[f'{measure}_zscore']).statistic
+        print(f'Pearson correlation: {pearson}')
+        pearson = pearsonr(scores, df[measure]).statistic
+        print(f'Pearson correlation: {pearson}')
+
+def test_bleu_simpeval_2022():
+    # Evaluate BLEU's correlation with human scores
+    # This should correspond to the tao_all value on Table 2 of the LENS paper
+
+    # The BLEU implemntation from Huggingface's evaluate package
+    bleu = evaluate.load('bleu')
+    
+    # SimpEval 2022 as provided in the LENS repo
+    df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpeval_2022.xlsx')
+    df_original = copy.deepcopy(df)
+
+    # The dataset contains two human simplifications for each source sentence.
+    # They use one as the reference and the other as the oracle output.
+    # I use Human 2 Writing as the reference and Human 1 Writing as the oracle output here. I've also tried the other way around.
+    df = df[df['system'] != 'Human 2 Writing']
+    
+    scores = []
+    for i in range(len(df)):
+        pred = df.iloc[i]['generation']
+
+        # Resolve the reference
+        original_id = df.iloc[i]['original_id']
+        human_generated = df_original['system'].isin(['Human 2 Writing'])
+        same_id = df_original['original_id'] == original_id
+        refs = df_original[human_generated & same_id]['generation'].tolist()
+        
+        # Compute BLEU under the default settings
+        score = bleu.compute(predictions = [pred], references = [refs])['bleu']
+        scores.append(score)
+
+    # Kendall tau-like with pairs where all annotators agree with the ranking order and unormalized score differences > 5
+    kendall = get_concordant_discordant_filtered(scores, df)
+    print(f'Kendall Tau-like (filtered pairs): {kendall}')
+
+def get_concordant_discordant_filtered(a, b, min_diff=5):
+    con = 0
+    dis = 0
+
+    # The LENS paper uses only pairs where all three annotators agree with the ranking order
+    # and the unnormalised score difference is larger than 5
+
+    # If by that, they mean the score difference is larger than 5 for each annotaor:
+    if True:
+        for i in range(len(a)):
+            for j in range(0, i):
+
+                # Filter out invalid pairs
+                filtered = False
+                for annotator_idx in range(1, 4):
+                    diff = b.iloc[j][f'rating_{annotator_idx}'] - b.iloc[i][f'rating_{annotator_idx}']
+
+                    # Filter out cases where score diff <= 5
+                    if abs(diff) <= min_diff:
+                        filtered = True
+
+                    # Make sure that all annotators agree with the order
+                    if annotator_idx == 1:
+                        larger = diff > 0
+                    else:
+                        if (diff > 0) != larger:
+                            filtered = True
+                            break
+                if filtered:
+                    continue
+
+                if larger:
+                    larger = 1
+                else:
+                    larger = -1
+
+                # Count concordanct and discordant pairs
+                if (a[j] - a[i]) * larger > 0:
+                    con += 1
+                else:
+                    dis += 1
+
+    # ... If by that, they mean the average score difference is larger than 5:
+    else:
+        for i in range(len(a)):
+            for j in range(0, i):
+
+                # Filter
+                filtered = False
+                diffs = []
+                for annotator_idx in range(1, 4):
+                    diff = b.iloc[j][f'rating_{annotator_idx}'] - b.iloc[i][f'rating_{annotator_idx}']
+                    diffs.append(diff)
+
+                    # Make sure that all annotators agree with the order
+                    if annotator_idx == 1:
+                        larger = diff > 0
+                    else:
+                        if (diff > 0) != larger:
+                            filtered = True
+                            break
+
+                # Make sure the average score diff is larger than 5
+                avg = sum(diffs) / len(diffs)
+                if abs(avg) <= min_diff:
+                    filtered = True
+                    
+                if filtered:
+                    continue
+
+                if larger:
+                    larger = 1
+                else:
+                    larger = -1
+
+                # Count concordanct and discordant pairs
+                if (a[j] - a[i]) * larger > 0:
+                    con += 1
+                else:
+                    dis += 1
+
+    print(f'Concordant: {con}, discordant: {dis}')
+    return (con - dis) / (con + dis)
