@@ -40,8 +40,6 @@ def run(args):
         for name, param in model.named_parameters():
             if 'deberta' not in name:
                 optimizer_params.append(param)
-                print(name)
-        exit()
     else:
         optimizer_params = model.parameters()
     optimizer = AdamW(optimizer_params, lr=args.lr)
