@@ -6,16 +6,15 @@ import datetime
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AdamW
+from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
 
 import utils.globals as uglobals
 from models.deberta_for_eval import DebertaForEval
-from utils.pretrain_stage_1_data_utils import make_pretraining_loader
-from utils.pretrain_stage_2_data_utils import make_pretraining_stage2_loader
-from utils.finetune_data_utils import make_finetuning_loader
+from utils.finetune_data_utils import make_finetuning_loader_bleurt
 
 def run(args):
     if args.debug:
-        args.stage = 'pretrain_2'
+        args.stage = 'finetune_simpeval'
         args.batch_size = 3
         args.batch_size_dev = 3
         args.n_epoch = 1
@@ -32,49 +31,36 @@ def run(args):
     writer = SummaryWriter(log_dir=f'{uglobals.RESULTS_DIR}/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=args)
 
     # Training setup
-    model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
+    checkpoint='lucadiliello/BLEURT-20-D12'
+    model = BleurtForSequenceClassification.from_pretrained(checkpoint) 
+    model.to(device)
+    tokenizer = BleurtTokenizer.from_pretrained(checkpoint)\
+
     criterion = torch.nn.MSELoss()
 
-    if args.freeze_deberta:
-        optimizer_params = []
-        for name, param in model.named_parameters():
-            if 'deberta' not in name:
-                optimizer_params.append(param)
-                print(name)
-        exit()
-    else:
-        optimizer_params = model.parameters()
+    optimizer_params = model.parameters()
     optimizer = AdamW(optimizer_params, lr=args.lr)
 
      # Load checkpoint
     if args.checkpoint != '':
         print(f'loading checkpoint: {args.checkpoint}')
         model.load_state_dict(torch.load(args.checkpoint, map_location=device)['model_state_dict'])
-        if args.cont_training:
-            optimizer.load_state_dict(torch.load(args.checkpoint, map_location=device)['optimizer_bert_state_dict'])
+        optimizer.load_state_dict(torch.load(args.checkpoint, map_location=device)['optimizer_state_dict'])
 
     # Data loaders for the current stage
     eval_n_epoch = 1
-    if args.stage == 'pretrain_1':
-        train_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/train.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
-        eval_n_epoch = 1
-    elif args.stage == 'pretrain_2':
-        train_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/train.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
-        eval_n_epoch = 4
-    elif args.stage == 'finetune_simpeval':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_train.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+    if args.stage == 'finetune_simpeval':
+        train_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_train.csv', args.batch_size)
+        dev_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_dev.csv', args.batch_size_dev, shuffle=False)
     elif args.stage == 'finetune_simpda_adaquacy':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_adaquacy.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_adaquacy.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        train_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_adaquacy.csv', args.batch_size)
+        dev_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_adaquacy.csv', args.batch_size_dev, shuffle=False)
     elif args.stage == 'finetune_simpda_fluency':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_fluency.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_fluency.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        train_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_fluency.csv', args.batch_size)
+        dev_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_fluency.csv',args.batch_size_dev, shuffle=False)
     elif args.stage == 'finetune_simpda_simplicity':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_simplicity.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_simplicity.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        train_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_simplicity.csv', args.batch_size)
+        dev_loader = make_finetuning_loader_bleurt(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_simplicity.csv', args.batch_size_dev, shuffle=False)
     else:
         raise NotImplementedError
     if args.save_epoch > 0:
@@ -88,7 +74,7 @@ def run(args):
         for batch_idx, batch in enumerate(train_loader):
             if args.debug and batch_idx > 3:
                 break
-            loss = train_step(batch, model, optimizer, criterion, device)
+            loss = train_step(batch, model, tokenizer, optimizer, criterion, device)
             n_iter += 1
             writer.add_scalar('Loss/train_batch', loss, n_iter)
             running_loss += loss.detach()
@@ -106,7 +92,7 @@ def run(args):
                 if args.debug and batch_idx > 3:
                     break
                 
-                dev_loss_iter = eval_step(batch, model, criterion, device)
+                dev_loss_iter = eval_step(batch, model, tokenizer, criterion, device)
                 dev_loss += dev_loss_iter.detach()
 
             dev_loss = dev_loss / len(dev_loader)
@@ -127,21 +113,17 @@ def run(args):
                 'optimizer_bert_state_dict': optimizer.state_dict(),
                 }, save_dir)
 
-def train_step(batch, model, optimizer, criterion, device):
+def train_step(batch, model, tokenizer, optimizer, criterion, device):
     model.train()
     optimizer.zero_grad()
 
     # Unpack the batch
-    sents, scores, score_masks = batch
+    src, pred, ref, scores = batch
     scores = scores.to(device).float()
-    score_masks = score_masks.to(device).float()
     
     # Forward
-    pred = model(sents).float()
-
-    # Apply score masks: zero-out unavailable scores
-    pred = pred * score_masks
-    scores = scores * score_masks
+    inputs = tokenizer(pred, ref, padding='longest', return_tensors='pt').to(device)
+    pred = model(**inputs).logits.flatten()
 
     # Loss
     loss = criterion(pred, scores).float()
@@ -153,24 +135,20 @@ def train_step(batch, model, optimizer, criterion, device):
     return loss
     
 
-def eval_step(batch, model, criterion, device):
+def eval_step(batch, model, tokenizer, criterion, device):
     model.eval()
     with torch.no_grad():
 
         # Unpack the batch
-        sents, scores, score_masks = batch
-        scores = scores.to(device)
-        score_masks = score_masks.to(device)
+        src, pred, ref, scores = batch
+        scores = scores.to(device).float()
         
         # Forward
-        pred = model(sents)
-
-        # Apply score masks: zero-out unavailable scores
-        pred = pred * score_masks
-        scores = scores * score_masks
+        inputs = tokenizer(pred, ref, padding='longest', return_tensors='pt').to(device)
+        pred = model(**inputs).logits.flatten()
 
         # Loss
-        loss = criterion(pred, scores)
+        loss = criterion(pred, scores).float()
 
         return loss
     
@@ -186,17 +164,14 @@ if __name__ == '__main__':
 
     # Formulation
     parser.add_argument('--stage', type=str)
-    parser.add_argument('--head_type', default='mlp', type=str)
     parser.add_argument('--save_epoch', default=0, type=int)
 
     # Training
-    parser.add_argument('--batch_size', default=32, type=int)
-    parser.add_argument('--batch_size_dev', default=16, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--batch_size_dev', default=8, type=int)
     parser.add_argument('--lr', default=3e-5, type=float)
     parser.add_argument('--n_epoch', default=1000, type=int)
     parser.add_argument('--checkpoint', default='', type=str)
-    parser.add_argument('--cont_training', action='store_true')
-    parser.add_argument('--freeze_deberta', action='store_true')
 
     args = parser.parse_args()
 

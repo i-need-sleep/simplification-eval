@@ -17,8 +17,8 @@ def simpeval_asset_make_splits(dev_size=10):
     # Select original sentences for the dev set
     dev_indices = np.random.choice([i for i in range(100)], size = dev_size, replace = False).tolist()
     
-    train = [[], [], []] # src, pred, score
-    dev = [[], [], []]
+    train = [[], [], [], []] # src, pred, score, ref
+    dev = [[], [], [], []]
     for i in range(len(df)):
         line = df.iloc[i]
 
@@ -33,36 +33,53 @@ def simpeval_asset_make_splits(dev_size=10):
         scores = [line[f'rating_{str(i+1)}_z_score'] for i in range(5)]
         lis[2].append(sum(scores) / len(scores))
 
+        # Resolve the reference
+        original_id = df.iloc[i]['original_id']
+        same_id = df['original_id'] == original_id
+        human_generated = df['system'].isin(['asset.test.simp'])
+        ref = df[human_generated & same_id]['generation'].tolist()[0]
+        lis[3].append(ref)
+
     train_out = {
         'src': train[0],
         'pred': train[1],
         'score': train[2],
+        'ref': train[3]
     }
     dev_out = {
         'src': dev[0],
         'pred': dev[1],
         'score': dev[2],
+        'ref': dev[3]
     }
     pd.DataFrame(train_out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_train.csv', index=False)
     pd.DataFrame(dev_out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_dev.csv', index=False)
 
 def process_simpeval_2022():
-    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simpeval_2022.csv')
+    df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpeval_2022.xlsx')
     
-    test = [[], [], []]
+    test = [[], [], [], []]
     for i in range(len(df)):
         line = df.iloc[i]
         
         test[0].append(line['original'])
         test[1].append(line['generation'])
 
+        # Resolve the reference
+        original_id = df.iloc[i]['original_id']
+        same_id = df['original_id'] == original_id
+        human_generated = df['system'].isin(['Human 1 Writing'])
+        ref = df[human_generated & same_id]['generation'].tolist()[0]
+        test[2].append(ref)
+
         scores = [line[f'rating_{str(i+1)}_zscore'] for i in range(3)]
-        test[2].append(sum(scores) / len(scores))
+        test[3].append(sum(scores) / len(scores))
 
     out = {
         'src': test[0],
         'pred': test[1],
-        'score': test[2],
+        'ref': test[2],
+        'score': test[3],
     }
     pd.DataFrame(out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_2022.csv', index=False)
 
@@ -155,6 +172,46 @@ def make_finetuning_loader(path, tokenizer, batch_size, shuffle=True):
     print(f'Making dataloader: {path}')
     print(f'# samples: {len(dataset)}')
     loader = DataLoader(dataset, batch_size=batch_size ,shuffle=shuffle, collate_fn=mr_collate)
+    return loader
+
+class FinetuneDatasetBLEURT(Dataset):
+    def __init__(self, aggregated_path):
+        self.df = pd.read_csv(aggregated_path)
+
+    def __len__(self):
+        return len(self.df) 
+
+    def __getitem__(self, i):
+        line = self.df.iloc[i]
+        
+        # Concat src and pred 
+        out = {
+            'src': line['src'],
+            'pred': line['pred'],
+            'ref': line['ref'],
+            'scores': line['score']
+            }
+        return out
+
+def mr_collate_bleurt(batch):
+    for idx, line in enumerate(batch):
+        if idx == 0:
+            src = [line['pred']]
+            pred = [line['src']]
+            ref = [line['ref']]
+            scores = torch.tensor(line['scores']).unsqueeze(0)
+        else:
+            src.append(line['src'])
+            pred.append(line['pred'])
+            ref.append(line['ref'])
+            scores = torch.cat((scores, torch.tensor(line['scores']).unsqueeze(0)), dim=0).float()
+    return src, pred, ref, scores
+    
+def make_finetuning_loader_bleurt(path, batch_size, shuffle=True):
+    dataset = FinetuneDatasetBLEURT(path)
+    print(f'Making BLEURT dataloader: {path}')
+    print(f'# samples: {len(dataset)}')
+    loader = DataLoader(dataset, batch_size=batch_size ,shuffle=shuffle, collate_fn=mr_collate_bleurt)
     return loader
 
 def test_bleurt(path):
