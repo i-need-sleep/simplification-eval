@@ -68,11 +68,10 @@ def run(args):
     if args.save_epoch > 0:
         eval_n_epoch = args.save_epoch
 
-    n_iter = 0
-    n_prev_iter = 0
-    running_loss = 0
-
     if not args.stage in ['finetune_simpda']:
+        n_iter = 0
+        n_prev_iter = 0
+        running_loss = 0
         for epoch in range(args.n_epoch):
             # Train
             for batch_idx, batch in enumerate(train_loader):
@@ -145,6 +144,10 @@ def run(args):
 
                 best_dev_loss = 100000
                 best_dev_cp = ''
+
+                n_iter = 0
+                n_prev_iter = 0
+                running_loss = 0
 
                 for epoch in range(args.n_epoch):
 
