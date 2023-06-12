@@ -195,6 +195,7 @@ def make_finetuning_loader(path, tokenizer, batch_size, shuffle=True):
 class FinetuneDatasetBLEURT(Dataset):
     def __init__(self, aggregated_path):
         self.df = pd.read_csv(aggregated_path)
+        self.df.fillna('Unk', inplace=True)
 
     def __len__(self):
         return len(self.df) 
