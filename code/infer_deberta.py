@@ -69,7 +69,7 @@ def run(args):
         if args.debug and batch_idx > 3:
             break
         
-        pred = eval_step(batch, model, criterion, device, args)
+        pred = infer_step(batch, model, criterion, device, args)
         preds = preds + pred
 
     human_scores = dev_loader.dataset.df['score'].tolist()
@@ -95,7 +95,7 @@ def run(args):
 
     
 
-def eval_step(batch, model, criterion, device, args):
+def infer_step(batch, model, criterion, device, args):
     model.eval()
     with torch.no_grad():
 
