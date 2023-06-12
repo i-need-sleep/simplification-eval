@@ -225,7 +225,7 @@ def run(args):
                 kendall_likes.append(kendall)
 
             print(measure)
-            print('Pearson:', sum(pearsons) / len(pearsons))
+            print('Pearsons:', sum(pearsons) / len(pearsons))
             print('Kendall-Tau-likes:', sum(kendall_likes) / len(kendall_likes))
 
 def train_step(batch, model, optimizer, criterion, device):
