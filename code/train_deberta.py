@@ -22,7 +22,6 @@ def run(args):
         args.batch_size_dev = 3
         args.n_epoch = 1
         args.head_type = 'linear'
-        args.checkpoint = '../results/checkpoints/simpeval/from_scratch.bin'
 
     print(args)
 
@@ -39,23 +38,13 @@ def run(args):
     model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
     criterion = torch.nn.MSELoss()
 
-    if args.freeze_deberta:
-        optimizer_params = []
-        for name, param in model.named_parameters():
-            if 'deberta' not in name:
-                optimizer_params.append(param)
-                print(name)
-        exit()
-    else:
-        optimizer_params = model.parameters()
+    optimizer_params = model.parameters()
     optimizer = AdamW(optimizer_params, lr=args.lr)
 
     # Load checkpoint
     if args.checkpoint != '':
         print(f'loading checkpoint: {args.checkpoint}')
         model.load_state_dict(torch.load(args.checkpoint, map_location=device)['model_state_dict'])
-        if args.cont_training:
-            optimizer.load_state_dict(torch.load(args.checkpoint, map_location=device)['optimizer_bert_state_dict'])
 
     # Data loaders for the current stage
     eval_n_epoch = 1
@@ -140,8 +129,20 @@ def run(args):
                 dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_dev_{measure}.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
                 test_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_test_{measure}.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
                 
-                print(f'loading checkpoint: {args.checkpoint}')
-                model.load_state_dict(torch.load(args.checkpoint, map_location=device)['model_state_dict'])
+                # Training setup
+                model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
+                criterion = torch.nn.MSELoss()
+
+
+                optimizer_params = model.parameters()
+                optimizer = AdamW(optimizer_params, lr=args.lr)
+
+                # Load checkpoint
+                if args.checkpoint != '':
+                    print(f'loading checkpoint: {args.checkpoint}')
+                    model.load_state_dict(torch.load(args.checkpoint, map_location=device)['model_state_dict'])
+                    if args.cont_training:
+                        optimizer.load_state_dict(torch.load(args.checkpoint, map_location=device)['optimizer_bert_state_dict'])
 
                 best_dev_loss = 100000
                 best_dev_cp = ''
