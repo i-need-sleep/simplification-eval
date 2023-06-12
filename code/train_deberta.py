@@ -122,8 +122,7 @@ def run(args):
         for measure in ['adequacy', 'fluency', 'simplicity']:
             pearsons = []
             kendall_likes = []
-            # for fold_idx in range(4):
-            for fold_idx in range(1):
+            for fold_idx in range(4):
                 # Get loaders
                 train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_train_{measure}.csv', model.tokenizer, args.batch_size)
                 dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_dev_{measure}.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
