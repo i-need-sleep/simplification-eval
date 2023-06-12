@@ -83,54 +83,72 @@ def process_simpeval_2022():
     }
     pd.DataFrame(out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_2022.csv', index=False)
 
-def process_simp_da(dev_size=5, test_size=25):
+def process_simp_da(dev_size=5, test_size=15, n_fold=4):
     df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpDA_2022.xlsx')
     
-    # Normalize
-    df.iloc[:, 5: ] = df.iloc[:, 5:].apply(lambda x: (x-x.mean())/ x.std(), axis=0)
+    # Normalize for each annotator
+    for annotator_idx in range(11):
+        for score_name in ['adequacy', 'fluency', 'simplicity']:
+            scores = df[df['WorkerId'] == annotator_idx][f'Answer.{score_name}']
+            if scores.std() == 0:
+                std = 1 #Handle cases where all scores are the same
+            else:
+                std = scores.std()
+            df.loc[df['WorkerId'] == annotator_idx, f'Answer.{score_name}'] = (scores - scores.mean()) / std
 
-    # Select original sentences for the dev/test splits
-    dev_indices = np.random.choice([i for i in range(60)], size = dev_size, replace = False).tolist()
-    indices = []
-    for i in range(60):
-        if i not in dev_indices:
-            indices.append(i)
-    test_indices = np.random.choice(indices, size = test_size, replace = False).tolist()
+    # Use Human 1 Writing as the reference 
+    # Both Human 1 Writing and Human 2 Writing are treated as oracle outputs
+    df_copy = copy.deepcopy(df)
+    df_refs = df_copy[df_copy['Input.system'] == 'Human 1 Writing']
 
-    train = [[] for _ in range(5)]
-    dev = [[] for _ in range(5)]
-    test = [[] for _ in range(5)]
-    for i in range(int(len(df) / 3)):
-        line = df.iloc[3 * i]
-        lines = df.iloc[3 * i: 3 * i + 3]
-        adequacy = np.average(np.array(lines.iloc[:, -3]))
-        fluency = np.average(np.array(lines.iloc[:, -2]))
-        simplicity = np.average(np.array(lines.iloc[:, -1]))
-
-        lis = train
-        if line['Input.id'] in dev_indices:
-            lis = dev
-        elif line['Input.id'] in test_indices:
-            lis = test
-
-        lis[0].append(line['Input.original'])
-        lis[1].append(line['Input.simplified'])
-        lis[2].append(adequacy)
-        lis[3].append(fluency)
-        lis[4].append(simplicity)
-    
-    def save_splits(lis, name):
-        for idx, score_name in enumerate(['adquacy', 'fluency', 'simplicity']):
+    def save_splits(lis, name, fold_idx):
+        for idx, score_name in enumerate(['adequacy', 'fluency', 'simplicity']):
             out = {
                 'src': lis[0],
                 'pred': lis[1],
-                'score': lis[2 + idx]
+                'ref': lis[2],
+                'score': lis[3 + idx]
             }
-            pd.DataFrame(out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_{name}_{score_name}.csv')
+            pd.DataFrame(out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_{name}_{score_name}.csv')
 
-    save_splits(train, 'train')
-    save_splits(dev, 'dev')
-    save_splits(test, 'test')
+    for fold_idx in range(n_fold):
+        # Select original sentences for the dev/test splits
+        dev_indices = np.random.choice([i for i in range(60)], size = dev_size, replace = False).tolist()
+        indices = []
+        for i in range(60):
+            if i not in dev_indices:
+                indices.append(i)
+        test_indices = np.random.choice(indices, size = test_size, replace = False).tolist()
+
+        train = [[] for _ in range(6)]
+        dev = [[] for _ in range(6)]
+        test = [[] for _ in range(6)]
+        for i in range(int(len(df) / 3)):
+            line = df.iloc[3 * i]
+            lines = df.iloc[3 * i: 3 * i + 3]
+            adequacy = np.average(np.array(lines.iloc[:, -3]))
+            fluency = np.average(np.array(lines.iloc[:, -2]))
+            simplicity = np.average(np.array(lines.iloc[:, -1]))
+
+            # Retrieve the reference
+            ref = df_refs[df_refs['Input.id'] == line['Input.id']]['Input.simplified'].tolist()[0]
+
+            lis = train
+            if line['Input.id'] in dev_indices:
+                lis = dev
+            elif line['Input.id'] in test_indices:
+                lis = test
+
+            lis[0].append(line['Input.original'])
+            lis[1].append(line['Input.simplified'])
+            lis[2].append(ref)
+            lis[3].append(adequacy)
+            lis[4].append(fluency)
+            lis[5].append(simplicity)
+    
+        save_splits(train, 'train', fold_idx)
+        save_splits(dev, 'dev', fold_idx)
+        save_splits(test, 'test', fold_idx)
 
 class FinetuneDataset(Dataset):
     def __init__(self, aggregated_path, tokenizer):

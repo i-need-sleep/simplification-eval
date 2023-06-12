@@ -34,7 +34,7 @@ def run(args):
     checkpoint='lucadiliello/BLEURT-20-D12'
     model = BleurtForSequenceClassification.from_pretrained(checkpoint) 
     model.to(device)
-    tokenizer = BleurtTokenizer.from_pretrained(checkpoint)\
+    tokenizer = BleurtTokenizer.from_pretrained(checkpoint)
 
     criterion = torch.nn.MSELoss()
 

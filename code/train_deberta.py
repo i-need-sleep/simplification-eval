@@ -66,15 +66,10 @@ def run(args):
     elif args.stage == 'finetune_simpeval':
         train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_train.csv', model.tokenizer, args.batch_size)
         dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
-    elif args.stage == 'finetune_simpda_adaquacy':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_adaquacy.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_adaquacy.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
-    elif args.stage == 'finetune_simpda_fluency':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_fluency.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_fluency.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
-    elif args.stage == 'finetune_simpda_simplicity':
-        train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_simplicity.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_simplicity.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+    elif args.stage in ['finetune_simpda_adequacy', 'finetune_simpda_fluency', 'finetune_simpda_simplicity']:
+        pass
+    #     train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_train_simplicity.csv', model.tokenizer, args.batch_size)
+    #     dev_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_dev_simplicity.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
     else:
         raise NotImplementedError
     if args.save_epoch > 0:
@@ -83,6 +78,7 @@ def run(args):
     n_iter = 0
     n_prev_iter = 0
     running_loss = 0
+    
     for epoch in range(args.n_epoch):
         # Train
         for batch_idx, batch in enumerate(train_loader):
