@@ -743,6 +743,7 @@ def get_bleurt_pretrained(srcs, preds, refs, checkpoint='lucadiliello/BLEURT-20-
     return scores
 
 def test_simpda(score_function):
+    out_str = ''
     for measure in ['adequacy', 'fluency', 'simplicity']:
         pearsons = []
         kendall_likes = []
@@ -767,7 +768,11 @@ def test_simpda(score_function):
             kendall_likes.append(kendall)
         
         print(measure)
-        print('Pearson:', round(sum(pearsons) / len(pearsons), 3))
-        print('Kendall-Tau-likes:', round(sum(kendall_likes) / len(kendall_likes), 3))
+        avg_pearson = '%.3f' % round(sum(pearsons) / len(pearsons), 3)
+        avg_kendall = '%.3f' % round(sum(kendall_likes) / len(kendall_likes), 3)
+        print('Pearson:', avg_pearson)
+        print('Kendall-Tau-likes:', avg_kendall)
+        out_str += f'{avg_pearson} & {avg_kendall} & '
 
+    print(out_str[:-2] + '\\\\')
     return

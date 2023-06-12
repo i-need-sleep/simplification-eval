@@ -149,6 +149,10 @@ def run(args):
                 n_prev_iter = 0
                 running_loss = 0
 
+                n_iter = 0
+                n_prev_iter = 0
+                running_loss = 0
+
                 for epoch in range(args.n_epoch):
 
                     # Train
