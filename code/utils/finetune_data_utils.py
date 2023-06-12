@@ -1,6 +1,7 @@
 import os
 import copy
 import json
+import random
 
 import pandas as pd
 import numpy as np
@@ -111,14 +112,16 @@ def process_simp_da(dev_size=5, test_size=15, n_fold=4):
             }
             pd.DataFrame(out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_{name}_{score_name}.csv')
 
+    # Scramble the indices for the source sentences
+    src_indices = [i for i in range(60)]
+    random.shuffle(src_indices)
+
     for fold_idx in range(n_fold):
         # Select original sentences for the dev/test splits
-        dev_indices = np.random.choice([i for i in range(60)], size = dev_size, replace = False).tolist()
-        indices = []
-        for i in range(60):
-            if i not in dev_indices:
-                indices.append(i)
-        test_indices = np.random.choice(indices, size = test_size, replace = False).tolist()
+        test_indices = src_indices[: test_size]
+        dev_indices  = src_indices[test_size: test_size + dev_size]
+        train_indices  = src_indices[test_size + dev_size : ]
+        src_indices = src_indices[test_size: ] + src_indices[: test_size]
 
         train = [[] for _ in range(6)]
         dev = [[] for _ in range(6)]
@@ -138,6 +141,9 @@ def process_simp_da(dev_size=5, test_size=15, n_fold=4):
                 lis = dev
             elif line['Input.id'] in test_indices:
                 lis = test
+                # No reference for the test set
+                if line['Input.system'] == 'Human 1 Writing':
+                    continue
 
             lis[0].append(line['Input.original'])
             lis[1].append(line['Input.simplified'])
@@ -673,12 +679,16 @@ def test_simpeval_2022(score_function=None, score_path=''):
 
     # Kendall tau-like with pairs where all annotators agree with the ranking order and unormalized score differences > 5
     kendall = get_concordant_discordant_filtered(scores, df)
-    print(f'Kendall Tau-like (filtered pairs): {kendall}')
+    print(f'Kendall Tau-like (filtered pairs): {"%.3f" % kendall}')
 
     # Pearson Corrlation
     avg_annotator_score = (np.array(df['rating_1_zscore']) + np.array(df['rating_2_zscore']) + np.array(df['rating_3_zscore'])) / 3
     pearson = pearsonr(scores, avg_annotator_score).statistic
-    print(f'Pearson correlation: {pearson}')
+    print(f'Pearson correlation: {"%.3f" % pearson}')
+
+    # Kendall tau-like on all the data
+    kendall = get_concordant_discordant(scores, avg_annotator_score)
+    print(f'Kendall Tau-like (all pairs): {"%.3f" % kendall}')
 
     return
 
