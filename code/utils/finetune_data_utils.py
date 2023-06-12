@@ -743,46 +743,31 @@ def get_bleurt_pretrained(srcs, preds, refs, checkpoint='lucadiliello/BLEURT-20-
     return scores
 
 def test_simpda(score_function):
-    df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpeval_2022.xlsx')
-    df_original = copy.deepcopy(df)
-    # Using Human 1 Writing as the reference and Human 2 Writing as the oracle output
-    filtered_indices = df['system'] != 'Human 1 Writing'
-    df = df[df['system'] != 'Human 1 Writing']
+    for measure in ['adequacy', 'fluency', 'simplicity']:
+        pearsons = []
+        kendall_likes = []
+        for fold_idx in range(4):
+            # Get loaders
+            df = pd.read_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_test_{measure}.csv')
 
-    srcs, preds, refs = [], [], []
-    for i in range(len(df)):
-        src = df.iloc[i]['original']
-        pred = df.iloc[i]['generation']
+            src = df['src'].tolist()
+            pred = df['pred'].tolist()
+            ref = df['ref'].tolist()
+            ref = [[r] for r in ref]
+            human_scores = df['score'].tolist()
 
-        # Resolve the reference
-        original_id = df.iloc[i]['original_id']
-        human_generated = df_original['system'].isin(['Human 1 Writing'])
-        same_id = df_original['original_id'] == original_id
-        ref = df_original[human_generated & same_id]['generation'].tolist()
+            scores = score_function(src, pred, ref)
 
-        srcs.append(src)
-        preds.append(pred)
-        refs.append(ref)
-    
-    if score_path == '':
-        scores = score_function(srcs, preds, refs)
-    else:
-        with open(score_path, 'r') as f:
-            scores_in = json.load(f)
+            # Pearson Corrlation
+            pearson = pearsonr(scores, human_scores).statistic
+            pearsons.append(pearson)
 
-        # Filter out the scores of the reference
-        scores = []
-        for i in range(len(scores_in)):
-            if filtered_indices[i]:
-                scores.append(scores_in[i])
-
-    # Kendall tau-like with pairs where all annotators agree with the ranking order and unormalized score differences > 5
-    kendall = get_concordant_discordant_filtered(scores, df)
-    print(f'Kendall Tau-like (filtered pairs): {kendall}')
-
-    # Pearson Corrlation
-    avg_annotator_score = (np.array(df['rating_1_zscore']) + np.array(df['rating_2_zscore']) + np.array(df['rating_3_zscore'])) / 3
-    pearson = pearsonr(scores, avg_annotator_score).statistic
-    print(f'Pearson correlation: {pearson}')
+            # Kendall tau-like 
+            kendall = get_concordant_discordant(scores, human_scores)
+            kendall_likes.append(kendall)
+        
+        print(measure)
+        print('Pearson:', round(sum(pearsons) / len(pearsons), 3))
+        print('Kendall-Tau-likes:', round(sum(kendall_likes) / len(kendall_likes), 3))
 
     return
