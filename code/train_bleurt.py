@@ -148,7 +148,7 @@ def run(args):
                     for batch_idx, batch in enumerate(train_loader):
                         if args.debug and batch_idx > 3:
                             break
-                        loss = train_step(batch, model, optimizer, criterion, device)
+                        loss = train_step(batch, model, tokenizer, optimizer, criterion, device)
                         n_iter += 1
                         writer.add_scalar('Loss/train_batch', loss, n_iter)
                         running_loss += loss.detach()
@@ -166,7 +166,7 @@ def run(args):
                             if args.debug and batch_idx > 3:
                                 break
                             
-                            dev_loss_iter = eval_step(batch, model, criterion, device)
+                            dev_loss_iter = eval_step(batch, model, tokenizer, criterion, device)
                             dev_loss += dev_loss_iter.detach()
 
                         dev_loss = dev_loss / len(dev_loader)
