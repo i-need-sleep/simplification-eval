@@ -753,6 +753,24 @@ def get_bleurt_pretrained(srcs, preds, refs, checkpoint='lucadiliello/BLEURT-20-
         scores = bleurt(**inputs).logits.flatten().cpu().tolist()
     return scores
 
+def get_bleurt_finetuned_simpeval(srcs, preds, refs, checkpoint='../results/checkpoints/simpeval/bleurt.bin'):
+    from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
+    original_checkpoint = 'lucadiliello/BLEURT-20-D12'
+
+    bleurt = BleurtForSequenceClassification.from_pretrained('lucadiliello/BLEURT-20-D12') 
+    device = torch.device('cpu')
+    print(f'Loading BLEURT checkpoint: {checkpoint}')
+    bleurt.load_state_dict(torch.load(checkpoint, map_location=device)['model_state_dict'])
+    bleurt.to(device)
+    bleurt.eval()
+    tokenizer = BleurtTokenizer.from_pretrained('lucadiliello/BLEURT-20-D12')
+
+
+    with torch.no_grad():
+        inputs = tokenizer(preds, [ref[0] for ref in refs], padding='longest', return_tensors='pt').to(device)
+        scores = bleurt(**inputs).logits.flatten().cpu().tolist()
+    return scores
+
 def test_simpda(score_function):
     out_str = ''
     for measure in ['adequacy', 'fluency', 'simplicity']:
@@ -787,3 +805,68 @@ def test_simpda(score_function):
 
     print(out_str[:-2] + '\\\\')
     return
+
+def simplicity_da_resolve_reference():
+    ref_path = f'{uglobals.STAGE2_OUTPUTS_DIR}/systems/dress/WikiLarge/test/Reference'
+    df_path = f'{uglobals.STAGE3_DIR}/simplicity_DA.csv'
+
+    df = pd.read_csv(df_path)
+    with open(ref_path) as f:
+        refs = f.readlines()
+
+    refs_out = []
+
+    for i in range(len(df)):
+        sent_id = df['sent_id'][i]
+        refs_out.append(refs[sent_id - 1])
+    
+    df['ref'] = refs_out
+    df.to_csv(df_path.replace('.csv', 'processed.csv'), index=False)
+
+def process_simplicity_da(dev_size=60, test_size=60, n_fold=5):
+    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simplicity_DA_processed.csv')
+    
+    def save_splits(lis, name, fold_idx):
+        for idx, score_name in enumerate(['adequacy', 'fluency', 'simplicity']):
+            out = {
+                'src': lis[0],
+                'pred': lis[1],
+                'ref': lis[2],
+                'score': lis[3 + idx]
+            }
+            pd.DataFrame(out).to_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_{name}_{score_name}.csv')
+
+    # Scramble the indices for the source sentences
+    src_indices = list(set(df['sent_id'].tolist()))
+    random.shuffle(src_indices)
+
+    for fold_idx in range(n_fold):
+        # Select original sentences for the dev/test splits
+        test_indices = src_indices[: test_size]
+        dev_indices  = src_indices[test_size: test_size + dev_size]
+        train_indices  = src_indices[test_size + dev_size : ]
+        src_indices = src_indices[test_size: ] + src_indices[: test_size]
+
+        train = [[] for _ in range(6)]
+        dev = [[] for _ in range(6)]
+        test = [[] for _ in range(6)]
+        for i in range(int(len(df) / 3)):
+            line = df.iloc[3 * i]
+            lines = df.iloc[3 * i: 3 * i + 3]
+
+            lis = train
+            if line['sent_id'] in dev_indices:
+                lis = dev
+            elif line['sent_id'] in test_indices:
+                lis = test
+
+            lis[0].append(line['orig_sent'])
+            lis[1].append(line['simp_sent'])
+            lis[2].append(line['ref'])
+            lis[3].append(line['meaning_zscore'])
+            lis[4].append(line['fluency_zscore'])
+            lis[5].append(line['simplicity_zscore'])
+    
+        save_splits(train, 'train', fold_idx)
+        save_splits(dev, 'dev', fold_idx)
+        save_splits(test, 'test', fold_idx)

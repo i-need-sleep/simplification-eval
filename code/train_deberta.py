@@ -7,6 +7,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from transformers import AdamW
 from scipy.stats import pearsonr
+import numpy as np
 
 import utils.globals as uglobals
 from models.deberta_for_eval import DebertaForEval
@@ -119,6 +120,7 @@ def run(args):
     # K-fold cross validation
     else:
         for measure in ['adequacy', 'fluency', 'simplicity']:
+            print(measure)
             pearsons = []
             kendall_likes = []
             for fold_idx in range(4):
@@ -165,7 +167,7 @@ def run(args):
                         running_loss += loss.detach()
 
                     # Batch loss
-                    print(f'Epoch {epoch} done. Loss: {running_loss/(n_iter-n_prev_iter)}')
+                    # print(f'Epoch {epoch} done. Loss: {running_loss/(n_iter-n_prev_iter)}')
                     writer.add_scalar('Loss/train_avg', running_loss/(n_iter-n_prev_iter), n_iter)
                     n_prev_iter = n_iter
                     running_loss = 0
@@ -181,7 +183,7 @@ def run(args):
                             dev_loss += dev_loss_iter.detach()
 
                         dev_loss = dev_loss / len(dev_loader)
-                        print(f'Dev loss: {dev_loss}')
+                        # print(f'Dev loss: {dev_loss}')
                         writer.add_scalar('loss/dev', dev_loss, n_iter)
 
                         # Save
@@ -216,17 +218,19 @@ def run(args):
 
                 # Pearson Corrlation
                 pearson = pearsonr(preds, human_scores).statistic
-                print(f'Pearson correlation: {pearson}')
                 pearsons.append(pearson)
 
                 # kendall tau-like
                 kendall = get_concordant_discordant(preds, human_scores)
-                print(f'Kendall Tau-like: {kendall}')
                 kendall_likes.append(kendall)
 
             print(measure)
             print('Pearsons:', sum(pearsons) / len(pearsons))
+            pearsons = np.array(pearsons)
+            print('std:', np.std(pearsons))
             print('Kendall-Tau-likes:', sum(kendall_likes) / len(kendall_likes))
+            kendall_likes = np.array(kendall_likes)
+            print('std:', np.std(kendall_likes))
 
 def train_step(batch, model, optimizer, criterion, device):
     model.train()

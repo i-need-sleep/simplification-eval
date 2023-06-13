@@ -132,18 +132,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    args.name = 'from_scratch'
+    args.name = 'from_stage2'
     args.stage = 'finetune_simpeval'
-    args.checkpoint = '../results/checkpoints/simpeval/from_scratch.bin'
+    args.checkpoint = '../results/checkpoints/simpeval/from_stage2.bin'
     args.head_type = 'linear'
-
-
-    # for stage in ['simplicity']:
-    #     for model in ['from_scratch', 'from_stage1', 'from_stage2']:
-    #         checkpoint = f'{uglobals.CHECKPOINTS_DIR}/{stage}/{model}.bin'
-
-    #         args.name = f'{stage}_{model}'
-    #         args.stage = f'finetune_{stage}'
-    #         args.checkpoint = checkpoint
             
     run(args)
