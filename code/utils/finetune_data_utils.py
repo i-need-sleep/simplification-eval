@@ -776,7 +776,7 @@ def test_simpda(score_function):
     for measure in ['adequacy', 'fluency', 'simplicity']:
         pearsons = []
         kendall_likes = []
-        for fold_idx in range(4):
+        for fold_idx in range(5):
             # Get loaders
             df = pd.read_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_test_{measure}.csv')
 
@@ -801,7 +801,9 @@ def test_simpda(score_function):
         avg_kendall = '%.3f' % round(sum(kendall_likes) / len(kendall_likes), 3)
         print('Pearson:', avg_pearson)
         print('Kendall-Tau-likes:', avg_kendall)
-        out_str += f'{avg_pearson} & {avg_kendall} & '
+        std_pearsons = '%.3f' % np.std(np.array(pearsons))
+        std_kendall = '%.3f' % np.std(np.array(kendall_likes))
+        out_str += f'${avg_pearson}\pm {std_pearsons}$ & ${avg_kendall} \pm {std_kendall}$ & '
 
     print(out_str[:-2] + '\\\\')
     return
