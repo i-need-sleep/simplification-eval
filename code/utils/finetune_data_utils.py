@@ -265,11 +265,15 @@ def test_bleurt(path):
     kendall = get_concordant_discordant(bleurt_scores, df['score'])
     print(f'Kendall Tau-like: {kendall}')
 
-def get_concordant_discordant(a, b):
+def get_concordant_discordant(a, b, n_sys=5):
     con = 0
     dis = 0
     for i in range(len(a)):
         for j in range(i, len(a)):
+            # Consider only system outputs from the same source sentence
+            if i // n_sys != j // n_sys:
+                continue
+            
             if (a[j] - a[i]) * (b[j] - b[i]) > 0:
                 con += 1
             else:
@@ -562,85 +566,58 @@ def get_concordant_discordant_filtered(a, b, min_diff=5):
 
     con = 0
     dis = 0
+    n_filtered = 0
 
     # The LENS paper uses only pairs where all three annotators agree with the ranking order
     # and the unnormalised score difference is larger than 5
 
-    # If by that, they mean the score difference is larger than 5 for each annotaor:
-    if False:
-        for i in range(len(a)):
-            for j in range(0, i):
+    # The score difference should be larger than 5 for at least two of the three annotators. 
+    for i in range(len(a)):
+        for j in range(0, i):
 
-                # Filter out invalid pairs
-                filtered = False
-                for annotator_idx in range(1, 4):
-                    diff = b.iloc[j][f'rating_{annotator_idx}'] - b.iloc[i][f'rating_{annotator_idx}']
+            # Consider only system outputs for the same source sentence
+            if b.iloc[i]['original_id'] != b.iloc[j]['original_id']:
+                continue
 
-                    # Filter out cases where score diff <= 5
-                    if abs(diff) <= min_diff:
+            # Filter
+            filtered = False
+            diffs = []
+            for annotator_idx in range(1, 4):
+                diff = b.iloc[j][f'rating_{annotator_idx}'] - b.iloc[i][f'rating_{annotator_idx}']
+                diffs.append(diff)
+
+                # Make sure that all annotators agree with the order
+                if annotator_idx == 1:
+                    larger = diff > 0
+                else:
+                    if (diff > 0) != larger:
                         filtered = True
+                        break
 
-                    # Make sure that all annotators agree with the order
-                    if annotator_idx == 1:
-                        larger = diff > 0
-                    else:
-                        if (diff > 0) != larger:
-                            filtered = True
-                            break
-                if filtered:
-                    continue
+            # Make sure the average score diff is larger than 5
+            larger_than_5_ctr = 0
+            for diff in diffs:
+                if abs(diff) > min_diff:
+                    larger_than_5_ctr += 1
+            if larger_than_5_ctr < 2:
+                filtered = True
+                
+            if filtered:
+                n_filtered += 1
+                continue
 
-                if larger:
-                    larger = 1
-                else:
-                    larger = -1
+            if larger:
+                larger = 1
+            else:
+                larger = -1
 
-                # Count concordanct and discordant pairs
-                if (a[j] - a[i]) * larger > 0:
-                    con += 1
-                else:
-                    dis += 1
+            # Count concordanct and discordant pairs
+            if (a[j] - a[i]) * larger > 0:
+                con += 1
+            else:
+                dis += 1
 
-    # ... If by that, they mean the average score difference is larger than 5:
-    else:
-        for i in range(len(a)):
-            for j in range(0, i):
-
-                # Filter
-                filtered = False
-                diffs = []
-                for annotator_idx in range(1, 4):
-                    diff = b.iloc[j][f'rating_{annotator_idx}'] - b.iloc[i][f'rating_{annotator_idx}']
-                    diffs.append(diff)
-
-                    # Make sure that all annotators agree with the order
-                    if annotator_idx == 1:
-                        larger = diff > 0
-                    else:
-                        if (diff > 0) != larger:
-                            filtered = True
-                            break
-
-                # Make sure the average score diff is larger than 5
-                avg = sum(diffs) / len(diffs)
-                if abs(avg) <= min_diff:
-                    filtered = True
-                    
-                if filtered:
-                    continue
-
-                if larger:
-                    larger = 1
-                else:
-                    larger = -1
-
-                # Count concordanct and discordant pairs
-                if (a[j] - a[i]) * larger > 0:
-                    con += 1
-                else:
-                    dis += 1
-
-    print(f'Concordant: {con}, discordant: {dis}')
+    print(f'Concordant: {con}, discordant: {dis}, filtered: {n_filtered}')
     return (con - dis) / (con + dis)
 
 def test_simpeval_2022(score_function=None, score_path=''):
@@ -736,7 +713,8 @@ def get_fkgl(srcs, preds, refs):
     import textstat
     scores = []
     for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
-        score =  score = textstat.syllable_count(pred) / textstat.lexicon_count(pred)
+        # score = textstat.syllable_count(pred) / textstat.lexicon_count(pred)
+        score = textstat.flesch_kincaid_grade(pred)
         scores.append(score)
     return scores
 
@@ -776,7 +754,7 @@ def test_simpda(score_function):
     for measure in ['adequacy', 'fluency', 'simplicity']:
         pearsons = []
         kendall_likes = []
-        for fold_idx in range(5):
+        for fold_idx in range(4):
             # Get loaders
             df = pd.read_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_test_{measure}.csv')
 
