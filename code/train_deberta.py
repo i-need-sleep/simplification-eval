@@ -27,7 +27,7 @@ def run(args):
     print(args)
 
     # Device
-    torch.manual_seed(21)
+    # torch.manual_seed(21)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
 
@@ -226,9 +226,11 @@ def run(args):
 
             print(measure)
             print('Pearsons:', sum(pearsons) / len(pearsons))
+            print(pearsons)
             pearsons = np.array(pearsons)
             print('std:', np.std(pearsons))
             print('Kendall-Tau-likes:', sum(kendall_likes) / len(kendall_likes))
+            print(kendall_likes)
             kendall_likes = np.array(kendall_likes)
             print('std:', np.std(kendall_likes))
 

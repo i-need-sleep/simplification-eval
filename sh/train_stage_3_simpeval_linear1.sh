@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=train_stage_3_simpeval       # 任务名
+#SBATCH --job-name=train_stage_3_simpeval_linear1       # 任务名
 #SBATCH --nodes=1                   # 这里不用动 多节点脚本请查官方文档
 #SBATCH --ntasks=1                  # 这里不用动 多任务脚本请查官方文档
 #SBATCH --cpus-per-task=4           # 要几块CPU (一般4块就够用了)
@@ -20,11 +20,12 @@ cd /l/users/yichen.huang/simplification-eval/code   # 切到程序目录
 echo "START"               # 输出起始信息
 source /apps/local/anaconda3/bin/activate tim          # 调用 virtual env
 python -u train_deberta.py \
-    --name train_stage_3_simpeval_3e-7 \
+    --name train_stage_3_simpeval_3e-7_linear1 \
     --stage finetune_simpeval \
     --lr 3e-7 \
     --batch_size 10 \
     --batch_size_dev 5 \
     --n_epoch 100 \
-    --save_epoch 10
+    --save_epoch 5 \
+    --head_type linear
 echo "FINISH"                       # 输出起始信息

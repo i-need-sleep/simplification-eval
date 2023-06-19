@@ -26,7 +26,7 @@ python -u train_deberta.py \
     --batch_size 10 \
     --batch_size_dev 5 \
     --n_epoch 100 \
-    --save_epoch 5 \
+    --save_epoch 10 \
     --head_type linear \
     --checkpoint ../results/checkpoints/stage_1_3e-5_linear/lr3e-05_3_5758_0.10180610418319702.bin
 echo "FINISH"                       # 输出起始信息
