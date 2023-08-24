@@ -24,7 +24,7 @@ def run(args):
     print(args)
 
     # Device
-    torch.manual_seed(21)
+    # torch.manual_seed(21)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
 
