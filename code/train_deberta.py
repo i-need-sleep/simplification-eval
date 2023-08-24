@@ -17,13 +17,6 @@ from utils.finetune_data_utils import make_finetuning_loader, get_concordant_dis
 from infer_deberta import infer_step
 
 def run(args):
-    if args.debug:
-        args.stage = 'finetune_simpda'
-        args.batch_size = 3
-        args.batch_size_dev = 3
-        args.n_epoch = 1
-        args.head_type = 'linear'
-
     print(args)
 
     # Device
@@ -36,7 +29,12 @@ def run(args):
     writer = SummaryWriter(log_dir=f'{uglobals.RESULTS_DIR}/runs/{args.name}/batch_size={args.batch_size}, Adam_lr={args.lr}/{date_str}' ,comment=args)
 
     # Training setup
-    model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
+    if args.backbone == 'deberta':
+        model = DebertaForEval(uglobals.DERBERTA_MODEL_DIR, uglobals.DERBERTA_TOKENIZER_DIR, device, head_type=args.head_type)
+    elif args.backbone == 'roberta':
+        model = DebertaForEval(uglobals.RORBERTA_MODEL_DIR, uglobals.RORBERTA_TOKENIZER_DIR, device, head_type=args.head_type, backbone='roberta')
+    else:
+        raise NotImplementedError
     criterion = torch.nn.MSELoss()
 
     optimizer_params = model.parameters()
@@ -293,6 +291,7 @@ if __name__ == '__main__':
 
     # Formulation
     parser.add_argument('--stage', type=str)
+    parser.add_argument('--backbone', type=str) # debeta, roberta
     parser.add_argument('--head_type', default='mlp', type=str)
     parser.add_argument('--save_epoch', default=0, type=int)
 
@@ -306,5 +305,13 @@ if __name__ == '__main__':
     parser.add_argument('--freeze_deberta', action='store_true')
 
     args = parser.parse_args()
+    
+    if args.debug:
+        args.stage = 'pretrain_1'
+        args.backbone = 'roberta'
+        args.batch_size = 3
+        args.batch_size_dev = 3
+        args.n_epoch = 1
+        args.head_type = 'linear'
 
     run(args)

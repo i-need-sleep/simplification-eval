@@ -620,12 +620,12 @@ def get_concordant_discordant_filtered(a, b, min_diff=5):
     print(f'Concordant: {con}, discordant: {dis}, filtered: {n_filtered}')
     return (con - dis) / (con + dis)
 
-def test_simpeval_2022(score_function=None, score_path=''):
+def test_simpeval_2022(score_function=None, score_path='', sent_type='Splittings'):
     df = pd.read_excel(f'{uglobals.STAGE3_DIR}/simpeval_2022.xlsx')
     df_original = copy.deepcopy(df)
     # Using Human 1 Writing as the reference and Human 2 Writing as the oracle output
-    filtered_indices = df['system'] != 'Human 1 Writing'
-    df = df[df['system'] != 'Human 1 Writing']
+    filtered_indices = df['sentence_type'] == sent_type
+    df = df[df['sentence_type'] == sent_type]
 
     srcs, preds, refs = [], [], []
     for i in range(len(df)):
