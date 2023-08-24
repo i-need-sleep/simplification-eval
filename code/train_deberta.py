@@ -45,6 +45,18 @@ def run(args):
         print(f'loading checkpoint: {args.checkpoint}')
         model.load_state_dict(torch.load(args.checkpoint, map_location=device)['model_state_dict'])
 
+    # Ablation on first-stage pretraining supervision signals
+    if args.ablate_supervision == 'none':
+        ablation_mask = [1 for _ in 13]
+    elif args.ablate_supervision == 'meaning':
+        ablation_mask = [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    elif args.ablate_supervision == 'fluency':
+        ablation_mask = [1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
+    elif args.ablate_supervision == 'simplicity':
+        ablation_mask = [1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]
+    else:
+        raise NotImplementedError
+
     # Data loaders for the current stage
     eval_n_epoch = 1
     if args.stage == 'pretrain_1':
@@ -76,7 +88,7 @@ def run(args):
             for batch_idx, batch in enumerate(train_loader):
                 if args.debug and batch_idx > 3:
                     break
-                loss = train_step(batch, model, optimizer, criterion, device)
+                loss = train_step(batch, model, optimizer, criterion, device, ablation_mask)
                 n_iter += 1
                 writer.add_scalar('Loss/train_batch', loss, n_iter)
                 running_loss += loss.detach()
@@ -94,7 +106,7 @@ def run(args):
                     if args.debug and batch_idx > 3:
                         break
                     
-                    dev_loss_iter = eval_step(batch, model, criterion, device)
+                    dev_loss_iter = eval_step(batch, model, criterion, device, ablation_mask)
                     dev_loss += dev_loss_iter.detach()
 
                 dev_loss = dev_loss / len(dev_loader)
@@ -159,7 +171,7 @@ def run(args):
                     for batch_idx, batch in enumerate(train_loader):
                         if args.debug and batch_idx > 3:
                             break
-                        loss = train_step(batch, model, optimizer, criterion, device)
+                        loss = train_step(batch, model, optimizer, criterion, device, ablation_mask)
                         n_iter += 1
                         writer.add_scalar('Loss/train_batch', loss, n_iter)
                         running_loss += loss.detach()
@@ -177,7 +189,7 @@ def run(args):
                             if args.debug and batch_idx > 3:
                                 break
                             
-                            dev_loss_iter = eval_step(batch, model, criterion, device)
+                            dev_loss_iter = eval_step(batch, model, criterion, device, ablation_mask)
                             dev_loss += dev_loss_iter.detach()
 
                         dev_loss = dev_loss / len(dev_loader)
@@ -232,7 +244,7 @@ def run(args):
             kendall_likes = np.array(kendall_likes)
             print('std:', np.std(kendall_likes))
 
-def train_step(batch, model, optimizer, criterion, device):
+def train_step(batch, model, optimizer, criterion, device, ablation_mask):
     model.train()
     optimizer.zero_grad()
 
@@ -240,6 +252,8 @@ def train_step(batch, model, optimizer, criterion, device):
     sents, scores, score_masks = batch
     scores = scores.to(device).float()
     score_masks = score_masks.to(device).float()
+
+    score_masks = score_masks * torch.tensor(ablation_mask).to(device)
     
     # Forward
     pred = model(sents).float()
@@ -258,7 +272,7 @@ def train_step(batch, model, optimizer, criterion, device):
     return loss
     
 
-def eval_step(batch, model, criterion, device):
+def eval_step(batch, model, criterion, device, ablation_mask):
     model.eval()
     with torch.no_grad():
 
@@ -266,6 +280,8 @@ def eval_step(batch, model, criterion, device):
         sents, scores, score_masks = batch
         scores = scores.to(device)
         score_masks = score_masks.to(device)
+
+        score_masks = score_masks * torch.tensor(ablation_mask).to(device)
         
         # Forward
         pred = model(sents)
@@ -303,6 +319,7 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', default='', type=str)
     parser.add_argument('--cont_training', action='store_true')
     parser.add_argument('--freeze_deberta', action='store_true')
+    parser.add_argument('--ablate_supervision', default='none', type=str) # none, meaning, fluency, simplicity
 
     args = parser.parse_args()
     
@@ -313,5 +330,6 @@ if __name__ == '__main__':
         args.batch_size_dev = 3
         args.n_epoch = 1
         args.head_type = 'linear'
+        args.ablate_supervision = 'meaning'
 
     run(args)
