@@ -132,9 +132,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    args.name = 'pretrained_2'
+    args.name = 'from_stage1_1'
     args.stage = 'finetune_simpeval'
-    args.checkpoint = '../results/checkpoints/simpeval/pretrained_2.bin'
+    args.checkpoint = '../results/checkpoints/simpeval/from_stage1_1.bin'
     args.head_type = 'linear'
             
     run(args)
