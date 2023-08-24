@@ -155,7 +155,7 @@ def stage2_aggregate_csvs(ref_free_path, ref_based_path, commonlit_src_path, com
     return
 
 def make_splits(path, dev_ratio=0.1):
-    df = pd.read_csv(path)
+    df = pd.read_csv(path).dropna()
 
     # Normalize
     df.iloc[:, 3: ] = df.iloc[:, 3:].apply(lambda x: (x-x.mean())/ x.std(), axis=0)

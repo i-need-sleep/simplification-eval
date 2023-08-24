@@ -60,12 +60,27 @@ def run(args):
     # Data loaders for the current stage
     eval_n_epoch = 1
     if args.stage == 'pretrain_1':
-        train_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/train.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_pretraining_loader(f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        train_path = f'{uglobals.PROCESSED_DIR}/openwebtext/train/train.csv'
+        dev_path = f'{uglobals.PROCESSED_DIR}/openwebtext/train/dev.csv'
+
+        if args.noaug:
+            train_path = train_path.replace('train.', 'train_noaug.')
+            dev_path = dev_path.replace('dev.', 'dev_noaug.')
+
+        train_loader = make_pretraining_loader(train_path, model.tokenizer, args.batch_size)
+        dev_loader = make_pretraining_loader(dev_path, model.tokenizer, args.batch_size_dev, shuffle=False)
         eval_n_epoch = 1
+
     elif args.stage == 'pretrain_2':
-        train_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/train.csv', model.tokenizer, args.batch_size)
-        dev_loader = make_pretraining_stage2_loader(f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv', model.tokenizer, args.batch_size_dev, shuffle=False)
+        train_path = f'{uglobals.STAGE2_OUTPUTS_DIR}/train/train.csv'
+        dev_path = f'{uglobals.STAGE2_OUTPUTS_DIR}/train/dev.csv'
+
+        if args.noaug:
+            train_path = train_path.replace('train.', 'train_noaug.')
+            dev_path = dev_path.replace('dev.', 'dev_noaug.')
+
+        train_loader = make_pretraining_stage2_loader(train_path, model.tokenizer, args.batch_size)
+        dev_loader = make_pretraining_stage2_loader(dev_path, model.tokenizer, args.batch_size_dev, shuffle=False)
         eval_n_epoch = 4
     elif args.stage == 'finetune_simpeval':
         train_loader = make_finetuning_loader(f'{uglobals.STAGE3_PROCESSED_DIR}/simpeval_asset_train.csv', model.tokenizer, args.batch_size)
@@ -320,6 +335,7 @@ if __name__ == '__main__':
     parser.add_argument('--cont_training', action='store_true')
     parser.add_argument('--freeze_deberta', action='store_true')
     parser.add_argument('--ablate_supervision', default='none', type=str) # none, meaning, fluency, simplicity
+    parser.add_argument('--noaug', action='store_true')
 
     args = parser.parse_args()
     
@@ -331,5 +347,6 @@ if __name__ == '__main__':
         args.n_epoch = 1
         args.head_type = 'linear'
         args.ablate_supervision = 'meaning'
+        args.noaug = True
 
     run(args)

@@ -177,7 +177,7 @@ def piece_commonlit_supervision(names):
 def aggregate_dfs(paths, out_path, dev_ratio=0.1):
     # Concat dfs
     dfs = [pd.read_csv(path) for path in paths]
-    df = pd.concat(dfs)
+    df = pd.concat(dfs).dropna()
 
     # Normalize
     starting_idx = df.columns.to_list().index('self_bleu')
