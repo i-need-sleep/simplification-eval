@@ -47,7 +47,7 @@ def run(args):
 
     # Ablation on first-stage pretraining supervision signals
     if args.ablate_supervision == 'none':
-        ablation_mask = [1 for _ in 13]
+        ablation_mask = [1 for _ in range(13)]
     elif args.ablate_supervision == 'meaning':
         ablation_mask = [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     elif args.ablate_supervision == 'fluency':
