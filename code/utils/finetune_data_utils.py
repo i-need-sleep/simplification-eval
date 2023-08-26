@@ -709,6 +709,22 @@ def get_bertscores_precision(srcs, preds, refs):
         scores.append(score)
     return scores
 
+def get_self_bertscore_f1(srcs, preds, refs):
+    bertscore = evaluate.load('bertscore')
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        score = bertscore.compute(predictions = [pred], references = [src], lang='en')['f1'][0]
+        scores.append(score)
+    return scores
+
+def get_self_bertscore_precision(srcs, preds, refs):
+    bertscore = evaluate.load('bertscore')
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        score = bertscore.compute(predictions = [pred], references = [src], lang='en')['precision'][0]
+        scores.append(score)
+    return scores
+
 def get_fkgl(srcs, preds, refs):
     import textstat
     scores = []
@@ -749,14 +765,20 @@ def get_bleurt_finetuned_simpeval(srcs, preds, refs, checkpoint='../results/chec
         scores = bleurt(**inputs).logits.flatten().cpu().tolist()
     return scores
 
-def test_simpda(score_function):
+def test_da(score_function, data_root=f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da', save_name='', set_measure='', set_fold=''):
     out_str = ''
+    dfs = []
     for measure in ['adequacy', 'fluency', 'simplicity']:
+        if set_measure != '' and set_measure != measure:
+            continue
         pearsons = []
         kendall_likes = []
-        for fold_idx in range(4):
+        for fold_idx in range(5):
+            if set_fold != '' and set_fold != fold_idx:
+                continue
+
             # Get loaders
-            df = pd.read_csv(f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da_fold{fold_idx}_test_{measure}.csv')
+            df = pd.read_csv(f'{data_root}_fold{fold_idx}_test_{measure}.csv')
 
             src = df['src'].tolist()
             pred = df['pred'].tolist()
@@ -766,6 +788,17 @@ def test_simpda(score_function):
 
             scores = score_function(src, pred, ref)
 
+            if save_name != '':
+                df_dict = {
+                    'src': src,
+                    'pred': pred,
+                    'ref': [r[0] for r in ref],
+                    'human_scores': human_scores,
+                    'score': scores
+                }
+                df = pd.DataFrame(df_dict)
+                dfs.append(df)
+
             # Pearson Corrlation
             pearson = pearsonr(scores, human_scores).statistic
             pearsons.append(pearson)
@@ -774,6 +807,11 @@ def test_simpda(score_function):
             kendall = get_concordant_discordant(scores, human_scores)
             kendall_likes.append(kendall)
         
+        if save_name != '':
+            # df = pd.concat(dfs)
+            # df.to_csv(f'{uglobals.OUTPUTS_DIR}/filtered/{save_name}.csv')
+            return df
+
         print(measure)
         avg_pearson = '%.3f' % round(sum(pearsons) / len(pearsons), 3)
         avg_kendall = '%.3f' % round(sum(kendall_likes) / len(kendall_likes), 3)
@@ -784,7 +822,7 @@ def test_simpda(score_function):
         out_str += f'${avg_pearson}\pm {std_pearsons}$ & ${avg_kendall} \pm {std_kendall}$ & '
 
     print(out_str[:-2] + '\\\\')
-    return
+    return 
 
 def simplicity_da_resolve_reference():
     ref_path = f'{uglobals.STAGE2_OUTPUTS_DIR}/systems/dress/WikiLarge/test/Reference'
@@ -850,3 +888,22 @@ def process_simplicity_da(dev_size=60, test_size=60, n_fold=5):
         save_splits(train, 'train', fold_idx)
         save_splits(dev, 'dev', fold_idx)
         save_splits(test, 'test', fold_idx)
+
+def get_referee(srcs, preds, refs):
+    checkpoint = ''
+    checkpoint = f'../../../simplification-eval/results/checkpoints/simpeval/{checkpoint}.bin'
+
+    device = torch.device('cpu')
+    model = DebertaForEval(uglobals.RORBERTA_MODEL_DIR, uglobals.RORBERTA_TOKENIZER_DIR, device, head_type='linear', backbone='deberta')
+
+    model.load_state_dict(torch.load(checkpoint, map_location=device)['model_state_dict'])
+
+    scores = []
+
+    for src, pred in zip(srcs, preds):
+        sent = [src + ' ' + model.tokenizer.sep_token + ' ' + pred]
+        pred = model(sent)
+
+        pred = pred[:, -1].reshape(-1).tolist()[0]
+        scores.append(pred)
+    return scores
