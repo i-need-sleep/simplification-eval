@@ -2,6 +2,7 @@ import os
 import copy
 import json
 import random
+import re
 
 import pandas as pd
 import numpy as np
@@ -9,6 +10,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from scipy.stats import pearsonr
 import evaluate
+import Levenshtein
 
 import utils.globals as uglobals
 
@@ -273,8 +275,49 @@ def get_concordant_discordant(a, b, n_sys=5):
             # Consider only system outputs from the same source sentence
             if i // n_sys != j // n_sys:
                 continue
+
+            # Consider only the same type of simplification
             
             if (a[j] - a[i]) * (b[j] - b[i]) > 0:
+                con += 1
+            else:
+                dis += 1
+    return (con - dis) / (con + dis)
+
+def get_concordant_discordant_type(scores, df):
+    con = 0
+    dis = 0
+
+    original_df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simpeval_2022.csv')
+
+    for i in range(len(df)):
+        for j in range(i):
+
+            # Consider only system outputs from the same source sentence
+            if df.iloc[i]['src'] != df.iloc[j]['src']:
+                continue            
+            
+            def find_max_overlap(str, df):
+                # Given a string, return the row in df that has the highest levenshtein distance
+                min_dist = 100
+                for i in range(len(df)):
+                    dist = Levenshtein.distance(str, df.iloc[i]['generation'])
+                    if dist < min_dist:
+                        min_dist = dist
+                        idx = i
+                # if min_dist > 3:
+                #     print(min_dist)
+                return idx
+
+            # Resolve the original annotations
+            type_i = original_df.iloc[find_max_overlap(df.iloc[i]['pred'], original_df)]['sentence_type']
+            type_j = original_df.iloc[find_max_overlap(df.iloc[j]['pred'], original_df)]['sentence_type']
+
+            # Consider only the same type of simplification
+            if type_i != type_j:
+                continue
+
+            if (scores[j] - scores[i]) * (df.iloc[j]['score'] - df.iloc[i]['score']) > 0:
                 con += 1
             else:
                 dis += 1
@@ -562,11 +605,13 @@ def test_bleu_simpeval_2022():
     kendall = get_concordant_discordant_filtered(scores, df)
     print(f'Kendall Tau-like (filtered pairs): {kendall}')
 
-def get_concordant_discordant_filtered(a, b, min_diff=5):
+def get_concordant_discordant_filtered(a, b, measure, min_diff=5):
 
     con = 0
     dis = 0
     n_filtered = 0
+
+    original_df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simpDA_2022.csv')
 
     # The LENS paper uses only pairs where all three annotators agree with the ranking order
     # and the unnormalised score difference is larger than 5
@@ -576,13 +621,24 @@ def get_concordant_discordant_filtered(a, b, min_diff=5):
         for j in range(0, i):
 
             # Consider only system outputs for the same source sentence
-            if b.iloc[i]['original_id'] != b.iloc[j]['original_id']:
+            if b.iloc[i]['src'] != b.iloc[j]['src']:
                 continue
+
+            def swap_non_alpha(s):
+                return re.sub(r'\W+', '', s)
+
+            # Resolve the original annotations
+            annotations_i = original_df[swap_non_alpha(original_df['Input.simplified']) == swap_non_alpha(b.iloc[i]['pred'])]
+            annotations_j = original_df[swap_non_alpha(original_df['Input.simplified']) == swap_non_alpha(b.iloc[j]['pred'])]
+            
+            print(annotations_i)
+            print(annotations_j)
+            exit()
 
             # Filter
             filtered = False
             diffs = []
-            for annotator_idx in range(1, 4):
+            for annotator_idx in range(3):
                 diff = b.iloc[j][f'rating_{annotator_idx}'] - b.iloc[i][f'rating_{annotator_idx}']
                 diffs.append(diff)
 
@@ -717,8 +773,9 @@ def get_self_bertscore_f1(srcs, preds, refs):
         scores.append(score)
     return scores
 
-def get_self_bertscore_precision(srcs, preds, refs):
-    bertscore = evaluate.load('bertscore')
+def get_self_bertscore_precision(srcs, preds, refs, bertscore=None):
+    if bertscore == None:
+        bertscore = evaluate.load('bertscore')
     scores = []
     for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
         score = bertscore.compute(predictions = [pred], references = [src], lang='en')['precision'][0]
@@ -734,13 +791,69 @@ def get_fkgl(srcs, preds, refs):
         scores.append(score)
     return scores
 
-def get_bleurt_pretrained(srcs, preds, refs, checkpoint='lucadiliello/BLEURT-20-D12'):
-    from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
-    bleurt = BleurtForSequenceClassification.from_pretrained(checkpoint) 
+def get_sle(srcs, preds, refs):
+
+    from sle.scorer import SLEScorer
+    scorer = SLEScorer("liamcripwell/sle-base")
+
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        score = scorer.score([pred], inputs=[src])['sle_delta'][0]
+        scores.append(score)
+    return scores
+
+def get_bets(srcs, preds, refs):
+    import transformers
+    from models.bets.metric import p_simp_score, r_meaning_score
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    checkpoint_path = f'../../bets/checkpoints/comparative0.ckpt'
+    ensemble_weights = []
+
+    model = 'roberta-large'
+
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model)
+    lm_model =  transformers.AutoModel.from_pretrained(model)
+
+    ranker = torch.load(checkpoint_path, map_location=device)
+    ranker.eval()
+    ranker.to(device)
+
+    if ensemble_weights == []:
+        simplicity_weight = 0.508
+        meaning_weight = 2.944
+    else:
+        simplicity_weight = ensemble_weights[0]
+        meaning_weight = ensemble_weights[1]
+
+    scores = []
+    for idx, (src, pred, ref) in enumerate(zip(srcs, preds, refs)):
+        try:
+            simplicity_score = p_simp_score(src, pred, tokenizer, lm_model, ranker, device)
+        except:
+            print('simp error')
+            simplicity_score = 0
+
+        try:
+            meaning_score = r_meaning_score(src, pred, tokenizer, lm_model, device)
+        except:
+            print('meaning wrong')
+            meaning_score = 0
+
+        score = simplicity_weight * simplicity_score + meaning_weight * meaning_score
+        scores.append(score)
+    return scores
+
+def get_bleurt_pretrained(srcs, preds, refs, checkpoint='lucadiliello/BLEURT-20-D12', bleurt=None, tokenizer=None):
+    if bleurt == None:
+        from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
+        bleurt = BleurtForSequenceClassification.from_pretrained(checkpoint) 
+        device = torch.device('cpu')
+        bleurt.to(device)
+        bleurt.eval()
+        tokenizer = BleurtTokenizer.from_pretrained(checkpoint)
+    
     device = torch.device('cpu')
-    bleurt.to(device)
-    bleurt.eval()
-    tokenizer = BleurtTokenizer.from_pretrained(checkpoint)
 
     with torch.no_grad():
         inputs = tokenizer(preds, [ref[0] for ref in refs], padding='longest', return_tensors='pt').to(device)
@@ -765,7 +878,7 @@ def get_bleurt_finetuned_simpeval(srcs, preds, refs, checkpoint='../results/chec
         scores = bleurt(**inputs).logits.flatten().cpu().tolist()
     return scores
 
-def test_da(score_function, data_root=f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da', save_name='', set_measure='', set_fold=''):
+def test_da(score_function, data_root=f'{uglobals.STAGE3_PROCESSED_DIR}/humanlikert_splits/simp_da', n_fold=4, multi_ref=True, filter_kendall=False, save_name='', set_measure='', set_fold=''):
     out_str = ''
     dfs = []
     for measure in ['adequacy', 'fluency', 'simplicity']:
@@ -773,7 +886,7 @@ def test_da(score_function, data_root=f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da'
             continue
         pearsons = []
         kendall_likes = []
-        for fold_idx in range(5):
+        for fold_idx in range(n_fold):
             if set_fold != '' and set_fold != fold_idx:
                 continue
 
@@ -786,7 +899,23 @@ def test_da(score_function, data_root=f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da'
             ref = [[r] for r in ref]
             human_scores = df['score'].tolist()
 
-            scores = score_function(src, pred, ref)
+            from bleurt_pytorch import BleurtConfig, BleurtForSequenceClassification, BleurtTokenizer
+            bleurt = BleurtForSequenceClassification.from_pretrained('lucadiliello/BLEURT-20-D12') 
+            device = torch.device('cpu')
+            bleurt.to(device)
+            bleurt.eval()
+            tokenizer = BleurtTokenizer.from_pretrained('lucadiliello/BLEURT-20-D12')
+            
+            if multi_ref:
+                scores = []
+                ref = [r[0][2: -2].split("', '") for r in ref]
+                for s, p, r in zip(src, pred, ref):
+                    line_scores = []
+                    for sub_r in r:
+                        line_scores.append(score_function([s], [p], [[sub_r]], bleurt=bleurt, tokenizer=tokenizer)[0])
+                    scores.append(np.mean(line_scores))
+            else:
+                scores = score_function(src, pred, ref)
 
             if save_name != '':
                 df_dict = {
@@ -804,12 +933,15 @@ def test_da(score_function, data_root=f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da'
             pearsons.append(pearson)
 
             # Kendall tau-like 
-            kendall = get_concordant_discordant(scores, human_scores)
+            if filter_kendall:
+                kendall = get_concordant_discordant_type(scores, df)
+            else:
+                kendall = get_concordant_discordant(scores, human_scores)
             kendall_likes.append(kendall)
         
         if save_name != '':
-            # df = pd.concat(dfs)
-            # df.to_csv(f'{uglobals.OUTPUTS_DIR}/filtered/{save_name}.csv')
+            df = pd.concat(dfs)
+            df.to_csv(f'{uglobals.OUTPUTS_DIR}/filtered/{save_name}.csv')
             return df
 
         print(measure)
@@ -819,7 +951,7 @@ def test_da(score_function, data_root=f'{uglobals.STAGE3_PROCESSED_DIR}/simp_da'
         print('Kendall-Tau-likes:', avg_kendall)
         std_pearsons = '%.3f' % np.std(np.array(pearsons))
         std_kendall = '%.3f' % np.std(np.array(kendall_likes))
-        out_str += f'${avg_pearson}\pm {std_pearsons}$ & ${avg_kendall} \pm {std_kendall}$ & '
+        out_str += f'${avg_pearson} \pm {std_pearsons}$ & '# & ${avg_kendall} \pm {std_kendall}$ & '
 
     print(out_str[:-2] + '\\\\')
     return 
@@ -841,8 +973,8 @@ def simplicity_da_resolve_reference():
     df['ref'] = refs_out
     df.to_csv(df_path.replace('.csv', 'processed.csv'), index=False)
 
-def process_simplicity_da(dev_size=60, test_size=60, n_fold=5):
-    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/simplicity_DA_processed.csv')
+def process_simplicity_da(in_file, dev_size=60, test_size=60, n_fold=5):
+    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/{in_file}.csv')
     
     def save_splits(lis, name, fold_idx):
         for idx, score_name in enumerate(['adequacy', 'fluency', 'simplicity']):
@@ -868,9 +1000,8 @@ def process_simplicity_da(dev_size=60, test_size=60, n_fold=5):
         train = [[] for _ in range(6)]
         dev = [[] for _ in range(6)]
         test = [[] for _ in range(6)]
-        for i in range(int(len(df) / 3)):
-            line = df.iloc[3 * i]
-            lines = df.iloc[3 * i: 3 * i + 3]
+        for i in range(len(df)):
+            line = df.iloc[i]
 
             lis = train
             if line['sent_id'] in dev_indices:
@@ -907,3 +1038,56 @@ def get_referee(srcs, preds, refs):
         pred = pred[:, -1].reshape(-1).tolist()[0]
         scores.append(pred)
     return scores
+
+def preprocess_human_likert():
+    df = pd.read_csv(f'{uglobals.STAGE3_DIR}/human_likert.csv')
+
+    for aspect in ['meaning', 'fluency', 'simplicity']:
+        aspect_df = df[df['aspect'] == aspect]
+        
+        # Normalize the ratings for each worker_id
+        for worker_id in set(aspect_df['worker_id'].tolist()):
+            ratings = aspect_df[aspect_df['worker_id'] == worker_id]['rating'].tolist()
+            mean = np.mean(ratings)
+            std = np.std(ratings)
+            df.loc[df['worker_id'] == worker_id, 'rating'] = (df[df['worker_id'] == worker_id]['rating'] - mean) / std
+    
+    df = df[df['simplification_type'] == 'human']
+    df.drop(['worker_id', 'simplification_type'], axis=1, inplace=True)
+    
+    # For each sentence, for each aspect, take the average of all ratings
+    sent_ids = df['sentence_id'].tolist()
+    sent_ids = list(set(sent_ids))
+    sent_ids.sort()
+
+    out = {
+        'sent_id': [],
+        'orig_sent': [],
+        'simp_sent': [],
+        'ref': [],
+        'fluency_zscore': [],
+        'meaning_zscore': [],
+        'simplicity_zscore': []
+    }
+
+    for sent_id in sent_ids:
+        sent_id_df = df[df['sentence_id'] == sent_id]
+        preds = sent_id_df['simplification'].tolist()
+        preds = list(set(preds))
+        
+        for pred in preds:
+            sent_df = sent_id_df[sent_id_df['simplification'] == pred]
+
+            out['sent_id'].append(sent_id)
+
+            out['orig_sent'].append(sent_df['source'].tolist()[0])
+            out['simp_sent'].append(pred)
+            out['ref'].append(sent_df['references'].tolist()[0])
+
+            out['fluency_zscore'].append(np.mean(sent_df['rating'][sent_df['aspect'] == 'fluency'].tolist()))
+            out['meaning_zscore'].append(np.mean(sent_df['rating'][sent_df['aspect'] == 'meaning'].tolist()))
+            out['simplicity_zscore'].append(np.mean(sent_df['rating'][sent_df['aspect'] == 'simplicity'].tolist()))
+
+    df_out = pd.DataFrame(out)
+    df_out.to_csv(f'{uglobals.STAGE3_DIR}/human_likert_processed.csv', index=False)
+    return

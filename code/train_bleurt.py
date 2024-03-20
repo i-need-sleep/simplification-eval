@@ -237,6 +237,7 @@ def train_step(batch, model, tokenizer, optimizer, criterion, device):
         print(pred)
         print(ref)
         raise
+        
     pred = model(**inputs).logits.flatten()
 
     # Loss
